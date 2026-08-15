@@ -680,7 +680,7 @@ app.get("/api/items/:type/:id/comments", async (c) => {
 
   const comments = (history.data || [])
     .map((row) => normalizeHistoryEntry(row))
-    .filter((ev) => ev.type === "comment" && ev.body)
+    .filter((ev) => ev.type === "comment" && (ev.body || ev.body_html))
     .sort((a, b) => (Date.parse(b.created_at || "") || 0) - (Date.parse(a.created_at || "") || 0));
 
   return c.json({
@@ -688,6 +688,69 @@ app.get("/api/items/:type/:id/comments", async (c) => {
     count: comments.length,
     latest: comments[0] || null,
     comments,
+  });
+});
+
+app.get("/api/proxy-media", async (c) => {
+  const session = await requireSession(c);
+  if (session instanceof Response) return session;
+
+  const rawUrl = (c.req.query("url") || "").trim();
+  if (!rawUrl) return c.json({ error: "url is required" }, 400);
+
+  let target: URL;
+  try {
+    target = new URL(rawUrl);
+  } catch {
+    return c.json({ error: "Invalid url" }, 400);
+  }
+  if (target.protocol !== "http:" && target.protocol !== "https:") {
+    return c.json({ error: "Invalid protocol" }, 400);
+  }
+
+  const webBase = (c.env.TAIGA_WEB_URL || "https://taiga.cloudiumedge.com").replace(/\/$/, "");
+  let allowedHost = "";
+  try {
+    allowedHost = new URL(webBase).host;
+  } catch {
+    allowedHost = "taiga.cloudiumedge.com";
+  }
+  if (target.host !== allowedHost) {
+    return c.json({ error: "Host not allowed" }, 403);
+  }
+
+  const upstream = await fetch(target.toString(), {
+    headers: {
+      Authorization: `Bearer ${session.token}`,
+      Accept: "image/*,application/octet-stream,*/*",
+    },
+  });
+
+  if (!upstream.ok) {
+    // Some Taiga installs serve media without bearer; retry plain
+    const retry = await fetch(target.toString(), {
+      headers: { Accept: "image/*,application/octet-stream,*/*" },
+    });
+    if (!retry.ok) {
+      return c.json({ error: "Failed to fetch media" }, 502);
+    }
+    const ctype = retry.headers.get("content-type") || "application/octet-stream";
+    return new Response(retry.body, {
+      status: 200,
+      headers: {
+        "Content-Type": ctype,
+        "Cache-Control": "private, max-age=300",
+      },
+    });
+  }
+
+  const ctype = upstream.headers.get("content-type") || "application/octet-stream";
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": ctype,
+      "Cache-Control": "private, max-age=300",
+    },
   });
 });
 

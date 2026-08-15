@@ -727,7 +727,7 @@ button.status-edit:focus-visible {
 }
 .comment-who strong { color: #1a2a24; }
 .comment-body {
-  line-height: 1.45;
+  line-height: 1.5;
   font-size: 0.92rem;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -739,13 +739,37 @@ button.status-edit:focus-visible {
   text-underline-offset: 2px;
   word-break: break-all;
 }
+.comment-body strong { font-weight: 700; color: #1a2a24; }
+.comment-body em { font-style: italic; }
+.comment-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: #eef3f0;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+}
+.comment-mention {
+  color: var(--brand-dark);
+  font-weight: 700;
+  background: var(--brand-soft);
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.86em;
+}
 .comment-attach {
   margin: 0.55rem 0;
   padding: 0;
   max-width: 100%;
 }
+.comment-attach-open {
+  display: grid;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: inherit;
+  max-width: 100%;
+}
 .comment-attach img {
-  display: block;
+  display: none;
   max-width: 100%;
   width: auto;
   height: auto;
@@ -755,7 +779,27 @@ button.status-edit:focus-visible {
   border: 1px solid var(--border);
   background: #fff;
 }
-.comment-attach a { display: inline-block; max-width: 100%; }
+.comment-attach.is-loaded img { display: block; }
+.comment-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  background: #fff;
+  border: 1px solid #b7cdc3;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+}
+.comment-attach.is-loaded .comment-attach-chip {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+.comment-attach.is-broken .comment-attach-chip {
+  background: var(--brand-soft);
+}
 
 .btn-comments {
   white-space: nowrap;

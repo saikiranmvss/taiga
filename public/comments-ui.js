@@ -34,9 +34,32 @@ function trimUrlMatch(url) {
   return String(url).replace(/[),.;!?]+$/g, "");
 }
 
-/** Turn markdown/plain comment text into safe HTML with images + links. */
+function proxyMediaUrl(url) {
+  return `/api/proxy-media?url=${encodeURIComponent(url)}`;
+}
+
+function neatAttachmentHtml(url, alt = "Attachment") {
+  const safe = escapeAttr(url);
+  const proxied = escapeAttr(proxyMediaUrl(url));
+  const label = escapeHtml(alt || "Attachment");
+  return `<figure class="comment-attach" data-src="${safe}">
+    <a class="comment-attach-open" href="${safe}" target="_blank" rel="noopener noreferrer">
+      <img src="${proxied}" alt="${label}" loading="lazy" data-comment-img="1" />
+      <span class="comment-attach-chip">Open image ↗</span>
+    </a>
+  </figure>`;
+}
+
+/** Client-side markdown fallback (server usually sends body_html). */
 export function formatCommentHtml(raw) {
-  const text = String(raw || "").replace(/\r\n/g, "\n").trim();
+  let text = String(raw || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/\\([\\`*_{}\[\]()#+\-.!|"'])/g, "$1")
+    .trim();
   if (!text) return "";
 
   const tokens = [];
@@ -46,39 +69,23 @@ export function formatCommentHtml(raw) {
     return key;
   };
 
-  let s = text;
-
-  // Markdown images: ![alt](url)
-  s = s.replace(/!\[([^\]]*)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, (full, alt, url) => {
+  text = text.replace(/!\[([^\]]*)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, (full, alt, url) => {
     if (!isSafeHttpUrl(url)) return full;
-    const safe = escapeAttr(url);
-    const label = escapeHtml(alt || "Attachment");
-    return token(
-      `<figure class="comment-attach"><a href="${safe}" target="_blank" rel="noopener noreferrer"><img src="${safe}" alt="${label}" loading="lazy" /></a></figure>`
-    );
+    return token(neatAttachmentHtml(url, alt || "Attachment"));
   });
 
-  // Markdown links: [label](url)
-  s = s.replace(/\[([^\]]+)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, (full, label, url) => {
+  text = text.replace(/\[([^\]]+)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, (full, label, url) => {
     if (!isSafeHttpUrl(url)) return full;
     return token(
       `<a class="comment-link" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
     );
   });
 
-  // Bare URLs
-  s = s.replace(/(https?:\/\/[^\s<]+)/g, (full) => {
+  text = text.replace(/(https?:\/\/[^\s<]+)/g, (full) => {
     const url = trimUrlMatch(full);
     const trailing = full.slice(url.length);
     if (!isSafeHttpUrl(url)) return full;
-    if (looksLikeImageUrl(url)) {
-      const safe = escapeAttr(url);
-      return (
-        token(
-          `<figure class="comment-attach"><a href="${safe}" target="_blank" rel="noopener noreferrer"><img src="${safe}" alt="Attachment" loading="lazy" /></a></figure>`
-        ) + trailing
-      );
-    }
+    if (looksLikeImageUrl(url)) return token(neatAttachmentHtml(url)) + trailing;
     return (
       token(
         `<a class="comment-link" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`
@@ -86,29 +93,51 @@ export function formatCommentHtml(raw) {
     );
   });
 
-  // Escape remaining text, keep newlines
-  s = escapeHtml(s).replace(/\n/g, "<br>");
+  text = escapeHtml(text);
+  text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/(^|[^*\w])\*(.+?)\*(?!\*)/g, "$1<em>$2</em>");
+  text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
+  text = text.replace(/(^|[\s(])@([a-zA-Z0-9._-]+)/g, '$1<span class="comment-mention">@$2</span>');
+  text = text.replace(/\n/g, "<br>");
 
   tokens.forEach((html, i) => {
-    s = s.replaceAll(`@@CMT${i}@@`, html);
+    text = text.replaceAll(`@@CMT${i}@@`, html);
   });
 
-  // Clean up excess breaks around figures
-  s = s
-    .replace(/(?:<br>\s*){0,2}(<figure class="comment-attach">)/g, "$1")
+  return text
+    .replace(/(?:<br>\s*){0,2}(<figure class="comment-attach")/g, "$1")
     .replace(/(<\/figure>)(?:\s*<br>){0,2}/g, "$1");
+}
 
-  return s;
+function commentBodyHtml(c) {
+  if (c?.body_html) return c.body_html;
+  return formatCommentHtml(c?.body || "");
 }
 
 function formatSnippet(text, max = 160) {
   const t = String(text || "")
     .replace(/!\[[^\]]*\]\(\s*https?:\/\/[^)\s]+\s*\)/g, "[image]")
     .replace(/https?:\/\/\S+/g, "[link]")
+    .replace(/\*\*/g, "")
     .replace(/\s+/g, " ")
     .trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max)}…`;
+}
+
+function bindCommentImages(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-comment-img]").forEach((img) => {
+    const figure = img.closest(".comment-attach");
+    img.addEventListener("load", () => {
+      figure?.classList.add("is-loaded");
+      figure?.classList.remove("is-broken");
+    });
+    img.addEventListener("error", () => {
+      figure?.classList.add("is-broken");
+      figure?.classList.remove("is-loaded");
+    });
+  });
 }
 
 function renderCommentCard(c, { latest = false, relativeTime, formatDate } = {}) {
@@ -121,7 +150,7 @@ function renderCommentCard(c, { latest = false, relativeTime, formatDate } = {})
           formatDate ? ` · ${escapeHtml(formatDate(c.created_at))}` : ""
         }</span>
       </div>
-      <div class="comment-body">${formatCommentHtml(c.body || "")}</div>
+      <div class="comment-body">${commentBodyHtml(c)}</div>
     </article>`;
 }
 
@@ -169,6 +198,7 @@ export function initCommentsUi({
       latestEl.innerHTML = latest
         ? renderCommentCard(latest, { latest: true, relativeTime, formatDate })
         : `<div class="comments-empty">No comments yet — be the first.</div>`;
+      bindCommentImages(latestEl);
     }
 
     if (listEl) {
@@ -184,6 +214,7 @@ export function initCommentsUi({
             .map((c) => renderCommentCard(c, { relativeTime, formatDate }))
             .join("")}`
         : "";
+      bindCommentImages(listEl);
     }
   }
 
@@ -317,4 +348,5 @@ export function renderDetailComments(target, data, { relativeTime, formatDate })
     : "";
 
   target.innerHTML = `${latestHtml}${listHtml}`;
+  bindCommentImages(target);
 }

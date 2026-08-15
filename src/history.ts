@@ -1,3 +1,5 @@
+import { buildCommentHtml } from "./comment-format";
+
 export type HistoryEvent = {
   id: string | number | null;
   created_at: string | null;
@@ -5,6 +7,7 @@ export type HistoryEvent = {
   type: "comment" | "status" | "field" | "create" | "other";
   title: string;
   body: string | null;
+  body_html?: string | null;
   changes: Array<{ field: string; from: string; to: string }>;
 };
 
@@ -91,7 +94,9 @@ export function normalizeHistoryEntry(entry: Record<string, unknown>): HistoryEv
   const user = entry.user as { name?: string; username?: string } | null | undefined;
   const userName = user?.name || user?.username || "Someone";
   const createdAt = entry.created_at ? String(entry.created_at) : null;
-  const comment = entry.comment ? stripHtml(String(entry.comment)) : "";
+  const rawComment = entry.comment ? String(entry.comment) : "";
+  const formatted = rawComment ? buildCommentHtml(rawComment) : { body: "", body_html: "" };
+  const comment = formatted.body;
   const diff = (entry.values_diff || {}) as Record<string, unknown>;
   const changes: HistoryEvent["changes"] = [];
 
@@ -129,14 +134,15 @@ export function normalizeHistoryEntry(entry: Record<string, unknown>): HistoryEv
     if (change) changes.push(change);
   }
 
-  if (comment) {
+  if (comment || formatted.body_html) {
     return {
       id: (entry.id as string | number) ?? null,
       created_at: createdAt,
       user_name: userName,
       type: "comment",
       title: "Comment",
-      body: comment,
+      body: comment || null,
+      body_html: formatted.body_html || null,
       changes,
     };
   }
