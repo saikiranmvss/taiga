@@ -17,5 +17,6 @@ migrations_dir = "migrations"
 
 [vars]
 TAIGA_API_URL = "https://taiga.cloudiumedge.com/api/v1"
+TAIGA_WEB_URL = "https://taiga.cloudiumedge.com"
 TAIGA_AUTH_TYPE = "ldap"
 APP_NAME = "Taiga Portal"

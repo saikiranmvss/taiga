@@ -214,7 +214,54 @@ input:focus, textarea:focus, select:focus {
   vertical-align: middle;
 }
 
-.work-list, .history-list { display: grid; gap: 0.7rem; }
+.toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 0.85rem;
+}
+.view-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.view-btn {
+  border: 0;
+  background: transparent;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.view-btn + .view-btn { border-left: 1px solid var(--border); }
+.view-btn.active {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.work-list.view-list { display: grid; gap: 0.7rem; }
+.work-list.view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+.work-list.view-table {
+  display: block;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.history-list { display: grid; gap: 0.7rem; }
+
 .work-item {
   width: 100%;
   border: 1px solid var(--border);
@@ -222,12 +269,11 @@ input:focus, textarea:focus, select:focus {
   padding: 0.95rem 1rem;
   background: var(--surface);
   box-shadow: var(--shadow);
-  cursor: pointer;
   text-align: left;
   font: inherit;
   color: inherit;
 }
-.work-item:hover { border-color: #b7cdc3; transform: translateY(-1px); }
+.work-item:hover { border-color: #b7cdc3; }
 .work-item .top {
   display: flex;
   justify-content: space-between;
@@ -235,6 +281,115 @@ input:focus, textarea:focus, select:focus {
   align-items: flex-start;
 }
 .work-item .subject { font-weight: 700; font-size: 1rem; }
+
+.ticket-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 180px;
+}
+.ticket-card .card-ref {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+.ticket-card .subject {
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  flex: 1;
+}
+.ticket-card .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: #f0f5f2;
+  width: fit-content;
+}
+.ticket-card .status-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.card-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: auto;
+}
+.card-actions .btn { padding: 0.45rem 0.7rem; font-size: 0.8rem; }
+
+.tickets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.tickets-table th,
+.tickets-table td {
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.tickets-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: #f7faf8;
+  position: sticky;
+  top: 0;
+}
+.tickets-table tr:hover td { background: #fafcfb; }
+.tickets-table .subject-cell {
+  font-weight: 600;
+  max-width: 320px;
+}
+.tickets-table .actions-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.35rem;
+}
+.btn-tiny {
+  padding: 0.35rem 0.55rem !important;
+  font-size: 0.75rem !important;
+  border-radius: 9px !important;
+  width: auto;
+}
+.btn-linkish {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--brand-dark);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-linkish:hover { background: var(--brand-soft); }
+
+.detail-actions-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.work-item .item-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+.work-item .item-actions .btn { width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem; }
+
+@media (max-width: 900px) {
+  .tickets-table .subject-cell { max-width: 200px; }
+}
+
 .badge-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; }
 .badge {
   font-size: 0.72rem;

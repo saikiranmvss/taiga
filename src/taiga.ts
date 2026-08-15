@@ -149,7 +149,7 @@ export class TaigaClient {
   }
 }
 
-export function normalizeItem(type: ItemType, item: Record<string, unknown>) {
+export function normalizeItem(type: ItemType, item: Record<string, unknown>, webBase?: string) {
   const status = item.status_extra_info as { name?: string; color?: string; is_closed?: boolean } | undefined;
   const project = item.project_extra_info as { name?: string; slug?: string } | undefined;
   const milestone = item.milestone_extra_info as { name?: string; id?: number } | null | undefined;
@@ -158,17 +158,24 @@ export function normalizeItem(type: ItemType, item: Record<string, unknown>) {
     ? item.tags.map((t) => (Array.isArray(t) ? String(t[0]) : String(t)))
     : [];
 
+  const projectSlug = project?.slug || null;
+  const ref = item.ref != null ? Number(item.ref) : null;
+  const base = (webBase || "https://taiga.cloudiumedge.com").replace(/\/$/, "");
+  const pathType = type === "userstory" ? "us" : type;
+  const taiga_url =
+    projectSlug && ref != null ? `${base}/project/${projectSlug}/${pathType}/${ref}` : null;
+
   return {
     type,
     id: Number(item.id),
-    ref: item.ref != null ? Number(item.ref) : null,
+    ref,
     subject: String(item.subject || "Untitled"),
     status_id: item.status != null ? Number(item.status) : null,
     status_name: status?.name || null,
     status_color: status?.color || null,
     project_id: item.project != null ? Number(item.project) : null,
     project_name: project?.name || null,
-    project_slug: project?.slug || null,
+    project_slug: projectSlug,
     milestone_id: milestone?.id != null ? Number(milestone.id) : item.milestone != null ? Number(item.milestone) : null,
     milestone_name: milestone?.name || null,
     assigned_name: assigned?.full_name_display || assigned?.username || null,
@@ -179,5 +186,6 @@ export function normalizeItem(type: ItemType, item: Record<string, unknown>) {
     due_date: item.due_date ? String(item.due_date) : null,
     is_blocked: Boolean(item.is_blocked),
     total_comments: item.total_comments != null ? Number(item.total_comments) : null,
+    taiga_url,
   };
 }

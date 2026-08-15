@@ -135,14 +135,24 @@
         <button type="button" class="chip chip-clear" data-quick="clear">Clear filters</button>
       </div>
 
+      <div class="toolbar-row">
+        <div id="work-status" class="muted work-status"></div>
+        <div class="view-switch" role="group" aria-label="View mode">
+          <button type="button" class="view-btn active" data-view="list" title="List view">List</button>
+          <button type="button" class="view-btn" data-view="grid" title="Card grid">Grid</button>
+          <button type="button" class="view-btn" data-view="table" title="Table grid">Table</button>
+        </div>
+      </div>
       <div id="summary-grid" class="summary-grid"></div>
       <div id="status-grid" class="status-grid"></div>
-      <div id="work-status" class="muted work-status"></div>
-      <div id="work-list" class="work-list"></div>
+      <div id="work-list" class="work-list view-list"></div>
     </section>
 
     <section id="view-detail" class="panel hidden">
-      <button id="back-btn" class="btn btn-ghost" type="button">← Back to My Work</button>
+      <div class="detail-actions-top">
+        <button id="back-btn" class="btn btn-ghost" type="button">← Back to My Work</button>
+        <a id="open-taiga-btn" class="btn btn-primary btn-inline" href="#" target="_blank" rel="noopener noreferrer">Open in Taiga ↗</a>
+      </div>
       <div class="detail-head">
         <div>
           <div id="detail-badges" class="badge-row"></div>

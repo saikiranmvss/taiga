@@ -29,12 +29,14 @@ const els = {
   historyList: document.getElementById("history-list"),
   commentInput: document.getElementById("comment-input"),
   commentError: document.getElementById("comment-error"),
+  openTaigaBtn: document.getElementById("open-taiga-btn"),
 };
 
 let currentUser = null;
 let currentItem = null;
 let itemsCache = [];
 let searchTimer = null;
+let viewMode = localStorage.getItem("tp_view_mode") || "list";
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
@@ -100,6 +102,25 @@ function typeLabel(type) {
   return type;
 }
 
+function taigaLink(item) {
+  if (!item?.taiga_url) return "";
+  return `<a class="btn btn-ghost btn-tiny btn-linkish" href="${escapeHtml(item.taiga_url)}" target="_blank" rel="noopener noreferrer" data-stop="1">Taiga ↗</a>`;
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  localStorage.setItem("tp_view_mode", mode);
+  document.querySelectorAll(".view-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-view") === mode);
+  });
+  els.workList.classList.remove("view-list", "view-grid", "view-table");
+  els.workList.classList.add(`view-${mode}`);
+  renderWork(itemsCache, lastSummary, lastWarnings);
+}
+
+let lastSummary = null;
+let lastWarnings = [];
+
 function renderHeader(user) {
   if (!user) {
     els.headerUser.classList.add("hidden");
@@ -123,11 +144,10 @@ function renderHeader(user) {
   };
 }
 
-function fillSelect(select, options, placeholderKeepFirst = true) {
-  const first = placeholderKeepFirst ? select.options[0]?.outerHTML || "" : "";
-  const extra = select.id === "filter-sprint"
-    ? `<option value="__none__">No sprint</option>`
-    : "";
+function fillSelect(select, options) {
+  const first = select.options[0]?.outerHTML || "";
+  const extra =
+    select.id === "filter-sprint" ? `<option value="__none__">No sprint</option>` : "";
   select.innerHTML =
     first +
     extra +
@@ -193,51 +213,143 @@ function renderStatusGrid(summary) {
   });
 }
 
-function renderWork(items, summary, warnings = []) {
-  itemsCache = items;
-  renderSummary(summary);
-  renderStatusGrid(summary);
+function badgesHtml(item) {
+  return `
+    <div class="badge-row">
+      <span class="badge type-${item.type}">${escapeHtml(typeLabel(item.type))}</span>
+      <span class="badge">#${item.ref ?? item.id}</span>
+      ${item.is_unread ? `<span class="badge unread">Unread</span>` : ""}
+      ${item.is_blocked ? `<span class="badge blocked">Blocked</span>` : ""}
+      ${item.status_name ? `<span class="badge">${escapeHtml(item.status_name)}</span>` : ""}
+    </div>`;
+}
 
-  const warn = warnings?.length ? ` · ${warnings.join("; ")}` : "";
-  els.workStatus.textContent = `${items.length} ticket(s) match your filters${warn}`;
+function bindStopLinks(root) {
+  root.querySelectorAll("[data-stop]").forEach((el) => {
+    el.addEventListener("click", (e) => e.stopPropagation());
+  });
+}
 
-  if (!items.length) {
-    els.workList.innerHTML = `<div class="panel"><p class="muted" style="margin:0">No tickets match. Clear filters or broaden search.</p></div>`;
-    return;
-  }
-
-  els.workList.innerHTML = items
-    .map((item) => {
-      const tags = (item.tags || [])
-        .slice(0, 3)
-        .map((t) => `<span class="badge">${escapeHtml(t)}</span>`)
-        .join("");
-      return `
-      <button class="work-item" data-type="${item.type}" data-id="${item.id}" type="button">
-        <div class="badge-row">
-          <span class="badge type-${item.type}">${escapeHtml(typeLabel(item.type))}</span>
-          <span class="badge">#${item.ref ?? item.id}</span>
-          ${item.is_unread ? `<span class="badge unread">Unread</span>` : ""}
-          ${item.is_blocked ? `<span class="badge blocked">Blocked</span>` : ""}
-          ${item.status_name ? `<span class="badge">${escapeHtml(item.status_name)}</span>` : ""}
-          ${tags}
-        </div>
-        <div class="top">
-          <div class="subject">${escapeHtml(item.subject)}</div>
-        </div>
+function renderList(items) {
+  return items
+    .map(
+      (item) => `
+      <div class="work-item" data-type="${item.type}" data-id="${item.id}">
+        ${badgesHtml(item)}
+        <div class="top"><div class="subject">${escapeHtml(item.subject)}</div></div>
         <div class="meta">
           ${escapeHtml(item.project_name || "Project")}
           · ${escapeHtml(item.milestone_name || "No sprint")}
           · updated ${escapeHtml(relativeTime(item.modified_date))}
           ${item.total_comments != null ? ` · ${item.total_comments} comment(s)` : ""}
         </div>
-      </button>`;
-    })
+        <div class="item-actions">
+          <button class="btn btn-primary btn-tiny" type="button" data-open="${item.type}:${item.id}">View</button>
+          ${taigaLink(item)}
+        </div>
+      </div>`
+    )
+    .join("");
+}
+
+function renderGrid(items) {
+  return items
+    .map(
+      (item) => `
+      <article class="ticket-card" data-type="${item.type}" data-id="${item.id}">
+        <div class="card-ref">${escapeHtml(typeLabel(item.type))} #${item.ref ?? item.id}</div>
+        ${badgesHtml(item)}
+        <div class="subject">${escapeHtml(item.subject)}</div>
+        <div class="status-pill">
+          <i class="dot" style="background:${escapeHtml(item.status_color || "#2f6f5e")}"></i>
+          ${escapeHtml(item.status_name || "No status")}
+        </div>
+        <div class="meta">
+          ${escapeHtml(item.project_name || "Project")}<br />
+          ${escapeHtml(item.milestone_name || "No sprint")} · ${escapeHtml(relativeTime(item.modified_date))}
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-primary btn-tiny" type="button" data-open="${item.type}:${item.id}">View</button>
+          ${taigaLink(item)}
+        </div>
+      </article>`
+    )
+    .join("");
+}
+
+function renderTable(items) {
+  const rows = items
+    .map(
+      (item) => `
+      <tr>
+        <td><strong>#${item.ref ?? item.id}</strong></td>
+        <td><span class="badge type-${item.type}">${escapeHtml(typeLabel(item.type))}</span></td>
+        <td class="subject-cell">${escapeHtml(item.subject)}</td>
+        <td>
+          <span class="status-pill">
+            <i class="dot" style="background:${escapeHtml(item.status_color || "#2f6f5e")}"></i>
+            ${escapeHtml(item.status_name || "—")}
+          </span>
+        </td>
+        <td>${escapeHtml(item.project_name || "—")}</td>
+        <td>${escapeHtml(item.milestone_name || "—")}</td>
+        <td>${item.is_unread ? `<span class="badge unread">Unread</span>` : `<span class="badge">Seen</span>`}</td>
+        <td>${escapeHtml(relativeTime(item.modified_date))}</td>
+        <td class="actions-cell">
+          <button class="btn btn-primary btn-tiny" type="button" data-open="${item.type}:${item.id}">View</button>
+          ${taigaLink(item)}
+        </td>
+      </tr>`
+    )
     .join("");
 
-  els.workList.querySelectorAll(".work-item").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      openItem(btn.getAttribute("data-type"), Number(btn.getAttribute("data-id")));
+  return `
+    <table class="tickets-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Type</th>
+          <th>Subject</th>
+          <th>Status</th>
+          <th>Project</th>
+          <th>Sprint</th>
+          <th>Read</th>
+          <th>Updated</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderWork(items, summary, warnings = []) {
+  itemsCache = items;
+  lastSummary = summary;
+  lastWarnings = warnings;
+  renderSummary(summary);
+  renderStatusGrid(summary);
+
+  const warn = warnings?.length ? ` · ${warnings.join("; ")}` : "";
+  els.workStatus.textContent = `${items.length} ticket(s) · ${viewMode} view${warn}`;
+
+  els.workList.classList.remove("view-list", "view-grid", "view-table");
+  els.workList.classList.add(`view-${viewMode}`);
+
+  if (!items.length) {
+    els.workList.innerHTML = `<div class="panel"><p class="muted" style="margin:0">No tickets match. Clear filters or broaden search.</p></div>`;
+    return;
+  }
+
+  if (viewMode === "grid") els.workList.innerHTML = renderGrid(items);
+  else if (viewMode === "table") els.workList.innerHTML = renderTable(items);
+  else els.workList.innerHTML = renderList(items);
+
+  bindStopLinks(els.workList);
+  els.workList.querySelectorAll("[data-open]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const [type, id] = btn.getAttribute("data-open").split(":");
+      openItem(type, Number(id));
     });
   });
 }
@@ -270,6 +382,17 @@ function renderHistory(events) {
     .join("");
 }
 
+function setOpenTaiga(url) {
+  if (!els.openTaigaBtn) return;
+  if (url) {
+    els.openTaigaBtn.href = url;
+    els.openTaigaBtn.classList.remove("hidden");
+  } else {
+    els.openTaigaBtn.href = "#";
+    els.openTaigaBtn.classList.add("hidden");
+  }
+}
+
 async function openItem(type, id) {
   currentItem =
     itemsCache.find((i) => i.type === type && i.id === id) || {
@@ -286,6 +409,7 @@ async function openItem(type, id) {
   `;
   els.detailTitle.textContent = currentItem.subject || `${type} #${id}`;
   els.detailMeta.textContent = `${currentItem.project_name || ""} · ${currentItem.milestone_name || "No sprint"} · updated ${relativeTime(currentItem.modified_date)}`;
+  setOpenTaiga(currentItem.taiga_url || null);
   els.detailSide.innerHTML = `
     <div class="row"><span>Type</span><strong>${escapeHtml(typeLabel(type))}</strong></div>
     <div class="row"><span>Ref</span><strong>#${currentItem.ref ?? id}</strong></div>
@@ -293,6 +417,11 @@ async function openItem(type, id) {
     <div class="row"><span>Project</span><strong>${escapeHtml(currentItem.project_name || "—")}</strong></div>
     <div class="row"><span>Sprint</span><strong>${escapeHtml(currentItem.milestone_name || "—")}</strong></div>
     <div class="row"><span>Updated</span><strong>${escapeHtml(formatDate(currentItem.modified_date))}</strong></div>
+    ${
+      currentItem.taiga_url
+        ? `<div class="row"><span>Taiga</span><strong><a href="${escapeHtml(currentItem.taiga_url)}" target="_blank" rel="noopener noreferrer">Open ticket ↗</a></strong></div>`
+        : ""
+    }
   `;
   els.historyList.innerHTML = `<p class="muted">Loading activity…</p>`;
   els.commentError.classList.add("hidden");
@@ -307,6 +436,7 @@ async function openItem(type, id) {
     if (detail?.item) {
       currentItem = { ...currentItem, ...detail.item };
       els.detailTitle.textContent = currentItem.subject;
+      setOpenTaiga(currentItem.taiga_url || null);
       els.detailSide.innerHTML = `
         <div class="row"><span>Type</span><strong>${escapeHtml(typeLabel(type))}</strong></div>
         <div class="row"><span>Ref</span><strong>#${currentItem.ref ?? id}</strong></div>
@@ -316,6 +446,11 @@ async function openItem(type, id) {
         <div class="row"><span>Blocked</span><strong>${currentItem.is_blocked ? "Yes" : "No"}</strong></div>
         <div class="row"><span>Updated</span><strong>${escapeHtml(formatDate(currentItem.modified_date))}</strong></div>
         <div class="row"><span>Created</span><strong>${escapeHtml(formatDate(currentItem.created_date))}</strong></div>
+        ${
+          currentItem.taiga_url
+            ? `<div class="row"><span>Taiga</span><strong><a href="${escapeHtml(currentItem.taiga_url)}" target="_blank" rel="noopener noreferrer">Open ticket ↗</a></strong></div>`
+            : ""
+        }
       `;
     }
 
@@ -343,15 +478,12 @@ async function loadWork() {
   els.workStatus.textContent = "Loading…";
   try {
     const data = await api(`/api/my-work?${queryFromFilters()}`);
-
-    // Refresh facet dropdowns without wiping current selection where possible
     const statusVal = els.filterStatus.value;
     const sprintVal = els.filterSprint.value;
     fillSelect(els.filterStatus, data.facets?.statuses || []);
     fillSelect(els.filterSprint, data.facets?.sprints || []);
     if (statusVal) els.filterStatus.value = statusVal;
     if (sprintVal) els.filterSprint.value = sprintVal;
-
     renderWork(data.items || [], data.summary, data.warnings || []);
   } catch (e) {
     els.workStatus.textContent = e.message;
@@ -365,6 +497,9 @@ async function loadMe() {
     currentUser = data.user;
     renderHeader(currentUser);
     show("work");
+    document.querySelectorAll(".view-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-view") === viewMode);
+    });
     await loadProjects();
     await loadWork();
   } catch {
@@ -401,6 +536,10 @@ document.getElementById("refresh-btn").addEventListener("click", loadWork);
 document.getElementById("back-btn").addEventListener("click", async () => {
   show("work");
   await loadWork();
+});
+
+document.querySelectorAll(".view-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setViewMode(btn.getAttribute("data-view")));
 });
 
 els.searchBtn.addEventListener("click", loadWork);
@@ -440,17 +579,11 @@ document.getElementById("quick-chips").addEventListener("click", (e) => {
     els.filterUnread.value = "all";
     els.filterClosed.value = "open";
     els.filterSort.value = "updated";
-  } else if (q === "unread") {
-    els.filterUnread.value = "unread";
-  } else if (q === "24h" || q === "7d") {
-    els.filterUpdated.value = q;
-  } else if (q === "issue") {
-    els.filterType.value = "issue";
-  } else if (q === "task") {
-    els.filterType.value = "task";
-  } else if (q === "story") {
-    els.filterType.value = "userstory";
-  }
+  } else if (q === "unread") els.filterUnread.value = "unread";
+  else if (q === "24h" || q === "7d") els.filterUpdated.value = q;
+  else if (q === "issue") els.filterType.value = "issue";
+  else if (q === "task") els.filterType.value = "task";
+  else if (q === "story") els.filterType.value = "userstory";
   loadWork();
 });
 

@@ -110,6 +110,7 @@ async function loadAssignedWork(
     closed: "open" | "closed" | "all";
     project?: number;
     q?: string;
+    webBase?: string;
   }
 ) {
   const results = await Promise.all(
@@ -132,7 +133,7 @@ async function loadAssignedWork(
       return;
     }
     if (Array.isArray(res.data)) {
-      items.push(...res.data.map((row) => normalizeItem(type, row)));
+      items.push(...res.data.map((row) => normalizeItem(type, row, opts.webBase)));
     }
   });
 
@@ -144,6 +145,14 @@ app.get("/api/health", (c) =>
     ok: true,
     app: c.env.APP_NAME || "Taiga Portal",
     time: new Date().toISOString(),
+  })
+);
+
+app.get("/api/config", (c) =>
+  c.json({
+    ok: true,
+    app: c.env.APP_NAME || "Taiga Portal",
+    taiga_web_url: (c.env.TAIGA_WEB_URL || "https://taiga.cloudiumedge.com").replace(/\/$/, ""),
   })
 );
 
@@ -247,7 +256,7 @@ app.get("/api/my-work", async (c) => {
       types,
       closed,
       project: Number.isFinite(project) ? project : undefined,
-      // Keep API q empty; we search locally across fields for better UX
+      webBase: c.env.TAIGA_WEB_URL,
     }),
     listTicketReads(c.env.DB, session.user.id).catch(() => ({
       results: [] as { item_type: string; item_id: number; last_seen_at: string }[],
@@ -330,7 +339,7 @@ app.get("/api/items/:type/:id", async (c) => {
     return c.json({ error: result.error || "Not found" }, result.status || 404);
   }
 
-  return c.json({ ok: true, item: normalizeItem(type, result.data), raw: result.data });
+  return c.json({ ok: true, item: normalizeItem(type, result.data, c.env.TAIGA_WEB_URL), raw: result.data });
 });
 
 app.get("/api/items/:type/:id/history", async (c) => {
