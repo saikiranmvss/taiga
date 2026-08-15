@@ -43,10 +43,8 @@ function neatAttachmentHtml(url, alt = "Attachment") {
   const proxied = escapeAttr(proxyMediaUrl(url));
   const label = escapeHtml(alt || "Attachment");
   return `<figure class="comment-attach" data-src="${safe}">
-    <a class="comment-attach-open" href="${safe}" target="_blank" rel="noopener noreferrer">
-      <img src="${proxied}" alt="${label}" loading="lazy" data-comment-img="1" />
-      <span class="comment-attach-chip">Open image ↗</span>
-    </a>
+    <img class="comment-attach-img" src="${proxied}" alt="${label}" loading="lazy" data-comment-img="1" />
+    <a class="comment-attach-chip" href="${proxied}" target="_blank" rel="noopener noreferrer">Open full size</a>
   </figure>`;
 }
 
@@ -127,16 +125,38 @@ function formatSnippet(text, max = 160) {
 
 function bindCommentImages(root) {
   if (!root) return;
-  root.querySelectorAll("[data-comment-img]").forEach((img) => {
+  root.querySelectorAll("[data-comment-img]").forEach(async (img) => {
     const figure = img.closest(".comment-attach");
-    img.addEventListener("load", () => {
-      figure?.classList.add("is-loaded");
-      figure?.classList.remove("is-broken");
-    });
-    img.addEventListener("error", () => {
+    const proxySrc = img.getAttribute("src");
+    if (!proxySrc) return;
+
+    // Fetch as blob so the browser always renders inline (never download)
+    try {
+      const res = await fetch(proxySrc, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      let type = blob.type;
+      if (!type.startsWith("image/")) {
+        const path = (figure?.getAttribute("data-src") || proxySrc).toLowerCase();
+        if (path.includes(".png")) type = "image/png";
+        else if (path.includes(".gif")) type = "image/gif";
+        else if (path.includes(".webp")) type = "image/webp";
+        else type = "image/jpeg";
+      }
+      const objectUrl = URL.createObjectURL(type === blob.type ? blob : new Blob([blob], { type }));
+      img.onload = () => {
+        figure?.classList.add("is-loaded");
+        figure?.classList.remove("is-broken");
+      };
+      img.onerror = () => {
+        figure?.classList.add("is-broken");
+        figure?.classList.remove("is-loaded");
+      };
+      img.src = objectUrl;
+    } catch {
       figure?.classList.add("is-broken");
       figure?.classList.remove("is-loaded");
-    });
+    }
   });
 }
 

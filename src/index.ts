@@ -751,10 +751,31 @@ app.get("/api/proxy-media", async (c) => {
   const headersList: HeadersInit[] = [
     {
       Authorization: `Bearer ${session.token}`,
-      Accept: "image/*,application/octet-stream,*/*",
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
     },
-    { Accept: "image/*,application/octet-stream,*/*" },
+    { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" },
   ];
+
+  const guessImageType = (url: string, ctype: string | null): string => {
+    const clean = (ctype || "").split(";")[0].trim().toLowerCase();
+    if (clean.startsWith("image/")) return clean;
+    const path = (() => {
+      try {
+        return new URL(url).pathname.toLowerCase();
+      } catch {
+        return url.toLowerCase();
+      }
+    })();
+    if (path.endsWith(".png")) return "image/png";
+    if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+    if (path.endsWith(".gif")) return "image/gif";
+    if (path.endsWith(".webp")) return "image/webp";
+    if (path.endsWith(".svg")) return "image/svg+xml";
+    if (path.endsWith(".bmp")) return "image/bmp";
+    // Taiga attachment hashes often have no extension; still treat as image for preview
+    if (path.includes("/media/attachments/")) return "image/jpeg";
+    return "application/octet-stream";
+  };
 
   for (const candidate of candidates) {
     for (const headers of headersList) {
@@ -764,14 +785,20 @@ app.get("/api/proxy-media", async (c) => {
           redirect: "follow",
         });
         if (!upstream.ok) continue;
-        const ctype = upstream.headers.get("content-type") || "application/octet-stream";
-        // Avoid returning HTML error pages as "images"
-        if (ctype.includes("text/html")) continue;
-        return new Response(upstream.body, {
+        const upstreamType = upstream.headers.get("content-type");
+        if ((upstreamType || "").includes("text/html")) continue;
+
+        const bytes = await upstream.arrayBuffer();
+        const ctype = guessImageType(candidate, upstreamType);
+        if (!ctype.startsWith("image/")) continue;
+
+        return new Response(bytes, {
           status: 200,
           headers: {
             "Content-Type": ctype,
+            "Content-Disposition": "inline",
             "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
           },
         });
       } catch {

@@ -59,10 +59,8 @@ function neatAttachment(src: string, alt = "Attachment"): string {
   const proxied = escapeAttr(proxyMediaUrl(src));
   const label = escapeHtml(alt || "Attachment");
   return `<figure class="comment-attach" data-src="${safeSrc}">
-    <a class="comment-attach-open" href="${safeSrc}" target="_blank" rel="noopener noreferrer">
-      <img src="${proxied}" alt="${label}" loading="lazy" data-comment-img="1" />
-      <span class="comment-attach-chip">Open image ↗</span>
-    </a>
+    <img class="comment-attach-img" src="${proxied}" alt="${label}" loading="lazy" data-comment-img="1" />
+    <a class="comment-attach-chip" href="${proxied}" target="_blank" rel="noopener noreferrer">Open full size</a>
   </figure>`;
 }
 
