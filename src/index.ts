@@ -102,6 +102,48 @@ function summarize(items: WorkItem[]) {
   };
 }
 
+async function loadMilestoneCatalog(
+  taiga: TaigaClient,
+  token: string,
+  projectIds: number[]
+) {
+  const byId = new Map<number, string>();
+  const names = new Set<string>();
+
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      if (!projectId) return;
+      const res = await taiga.milestonesForProject(token, projectId);
+      if (!res.ok || !Array.isArray(res.data)) return;
+      for (const row of res.data) {
+        const id = Number(row.id);
+        const name = String(row.name || "").trim();
+        if (!id || !name) continue;
+        byId.set(id, name);
+        names.add(name);
+      }
+    })
+  );
+
+  return {
+    byId,
+    names: Array.from(names).sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+function applyMilestoneNames(
+  items: ReturnType<typeof normalizeItem>[],
+  byId: Map<number, string>
+) {
+  return items.map((item) => {
+    if (item.milestone_name) return item;
+    if (item.milestone_id && byId.has(item.milestone_id)) {
+      return { ...item, milestone_name: byId.get(item.milestone_id)! };
+    }
+    return item;
+  });
+}
+
 async function loadAssignedWork(
   taiga: TaigaClient,
   token: string,
@@ -400,12 +442,34 @@ app.get("/api/my-work", async (c) => {
         webBase: c.env.TAIGA_WEB_URL,
       });
 
-  const [{ items, warnings }, reads] = await Promise.all([
+  const [{ items: rawItems, warnings }, reads] = await Promise.all([
     workPromise,
     listTicketReads(c.env.DB, session.user.id).catch(() => ({
       results: [] as { item_type: string; item_id: number; last_seen_at: string }[],
     })),
   ]);
+
+  let projectIds = Number.isFinite(project as number) && (project as number) > 0
+    ? [project as number]
+    : Array.from(
+        new Set(
+          rawItems
+            .map((i) => i.project_id)
+            .filter((id): id is number => typeof id === "number" && id > 0)
+        )
+      );
+
+  if (!projectIds.length) {
+    const projects = await taiga.projectsForMember(session.token, session.user.id);
+    if (projects.ok && Array.isArray(projects.data)) {
+      projectIds = projects.data
+        .map((p) => Number(p.id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+    }
+  }
+
+  const milestoneCatalog = await loadMilestoneCatalog(taiga, session.token, projectIds);
+  const items = applyMilestoneNames(rawItems, milestoneCatalog.byId);
 
   const readMap = new Map(
     (reads.results || []).map((r) => [`${r.item_type}:${r.item_id}`, r.last_seen_at])
@@ -445,9 +509,12 @@ app.get("/api/my-work", async (c) => {
     return (Date.parse(b.modified_date || "") || 0) - (Date.parse(a.modified_date || "") || 0);
   });
 
-  const sprints = Array.from(
-    new Set(facetsBase.map((i) => i.milestone_name).filter(Boolean) as string[])
-  ).sort((a, b) => a.localeCompare(b));
+  const sprintsFromItems = facetsBase
+    .map((i) => i.milestone_name)
+    .filter((name): name is string => Boolean(name));
+  const sprints = Array.from(new Set([...milestoneCatalog.names, ...sprintsFromItems])).sort(
+    (a, b) => a.localeCompare(b)
+  );
 
   const statuses = Array.from(
     new Set(facetsBase.map((i) => i.status_name).filter(Boolean) as string[])

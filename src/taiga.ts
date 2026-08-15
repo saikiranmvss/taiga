@@ -115,6 +115,15 @@ export class TaigaClient {
     );
   }
 
+  milestonesForProject(token: string, projectId: number) {
+    return this.request<Record<string, unknown>[]>(
+      "GET",
+      `/milestones${qs({ project: projectId })}`,
+      null,
+      token
+    );
+  }
+
   getItem(token: string, type: ItemType, id: number) {
     const path =
       type === "userstory" ? `/userstories/${id}` : type === "task" ? `/tasks/${id}` : `/issues/${id}`;

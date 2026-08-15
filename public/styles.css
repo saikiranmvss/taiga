@@ -298,13 +298,58 @@ input:focus, textarea:focus, select:focus {
   text-align: left;
   font: inherit;
   color: inherit;
+  --status-color: #2f6f5e;
+  background: color-mix(in srgb, var(--status-color) 10%, #fff);
+  border-color: color-mix(in srgb, var(--status-color) 28%, var(--border));
 }
-.status-card:hover { border-color: #b7cdc3; }
+.status-card:hover {
+  border-color: color-mix(in srgb, var(--status-color) 55%, #b7cdc3);
+}
 .status-card .dot {
   width: 8px; height: 8px; border-radius: 50%;
   display: inline-block; margin-right: 0.35rem;
   vertical-align: middle;
+  background: var(--status-color);
 }
+.status-card span { color: color-mix(in srgb, var(--status-color) 70%, #334); text-transform: none; letter-spacing: 0; font-size: 0.78rem; font-weight: 700; }
+.status-card strong { color: color-mix(in srgb, var(--status-color) 55%, #1a2a24); }
+
+.badge.status-badge {
+  --status-color: #2f6f5e;
+  background: color-mix(in srgb, var(--status-color) 16%, #fff);
+  color: color-mix(in srgb, var(--status-color) 72%, #1a2a24);
+  border: 1px solid color-mix(in srgb, var(--status-color) 28%, transparent);
+}
+
+.status-pill {
+  --status-color: #2f6f5e;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  width: fit-content;
+  background: color-mix(in srgb, var(--status-color) 14%, #fff);
+  color: color-mix(in srgb, var(--status-color) 70%, #1a2a24);
+  border: 1px solid color-mix(in srgb, var(--status-color) 26%, transparent);
+}
+.status-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-color);
+  flex-shrink: 0;
+}
+.ticket-card .status-pill {
+  background: color-mix(in srgb, var(--status-color) 14%, #fff);
+}
+.ticket-card .status-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--status-color);
+}
+
 
 @media (max-width: 900px) {
   .workbench {
@@ -412,20 +457,6 @@ input:focus, textarea:focus, select:focus {
   font-size: 0.98rem;
   line-height: 1.35;
   flex: 1;
-}
-.ticket-card .status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  background: #f0f5f2;
-  width: fit-content;
-}
-.ticket-card .status-pill .dot {
-  width: 8px; height: 8px; border-radius: 50%;
 }
 .card-actions {
   display: flex;

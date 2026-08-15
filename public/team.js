@@ -107,6 +107,23 @@ function typeLabel(type) {
   return type;
 }
 
+function statusVars(color) {
+  const c = color || "#2f6f5e";
+  return `--status-color:${escapeHtml(c)}`;
+}
+
+function statusBadgeHtml(name, color) {
+  if (!name) return "";
+  return `<span class="badge status-badge" style="${statusVars(color)}">${escapeHtml(name)}</span>`;
+}
+
+function statusPillHtml(name, color) {
+  return `<span class="status-pill" style="${statusVars(color)}">
+    <i class="dot" aria-hidden="true"></i>
+    ${escapeHtml(name || "—")}
+  </span>`;
+}
+
 function taigaLink(item) {
   if (!item?.taiga_url) return "";
   return `<a class="btn btn-ghost btn-tiny btn-linkish" href="${escapeHtml(item.taiga_url)}" target="_blank" rel="noopener noreferrer" data-stop="1">Taiga ↗</a>`;
@@ -229,8 +246,8 @@ function renderStatusGrid(summary) {
   els.statusGrid.innerHTML = statuses
     .map(
       (s) => `
-      <button class="status-card" type="button" data-status="${escapeHtml(s.name)}">
-        <span><i class="dot" style="background:${escapeHtml(s.color || "#2f6f5e")}"></i>${escapeHtml(s.name)}</span>
+      <button class="status-card" type="button" data-status="${escapeHtml(s.name)}" style="${statusVars(s.color)}">
+        <span><i class="dot" aria-hidden="true"></i>${escapeHtml(s.name)}</span>
         <strong>${s.count}</strong>
       </button>`
     )
@@ -251,7 +268,7 @@ function badgesHtml(item) {
       <span class="badge">#${item.ref ?? item.id}</span>
       ${item.is_unread ? `<span class="badge unread">Unread</span>` : ""}
       ${item.is_blocked ? `<span class="badge blocked">Blocked</span>` : ""}
-      ${item.status_name ? `<span class="badge">${escapeHtml(item.status_name)}</span>` : ""}
+      ${statusBadgeHtml(item.status_name, item.status_color)}
     </div>`;
 }
 
@@ -294,10 +311,7 @@ function renderGrid(items) {
         <div class="card-ref">${escapeHtml(typeLabel(item.type))} #${item.ref ?? item.id}</div>
         ${badgesHtml(item)}
         <div class="subject">${escapeHtml(item.subject)}</div>
-        <div class="status-pill">
-          <i class="dot" style="background:${escapeHtml(item.status_color || "#2f6f5e")}"></i>
-          ${escapeHtml(item.status_name || "No status")}
-        </div>
+        ${statusPillHtml(item.status_name || "No status", item.status_color)}
         <div class="meta">
           ${showAssignee ? `${escapeHtml(item.assigned_name || "Unassigned")}<br />` : ""}
           ${escapeHtml(item.project_name || "Project")}<br />
@@ -322,12 +336,7 @@ function renderTable(items) {
         <td><span class="badge type-${item.type}">${escapeHtml(typeLabel(item.type))}</span></td>
         <td class="subject-cell">${escapeHtml(item.subject)}</td>
         ${showAssignee ? `<td>${escapeHtml(item.assigned_name || "—")}</td>` : ""}
-        <td>
-          <span class="status-pill">
-            <i class="dot" style="background:${escapeHtml(item.status_color || "#2f6f5e")}"></i>
-            ${escapeHtml(item.status_name || "—")}
-          </span>
-        </td>
+        <td>${statusPillHtml(item.status_name, item.status_color)}</td>
         <td>${escapeHtml(item.project_name || "—")}</td>
         <td>${escapeHtml(item.milestone_name || "—")}</td>
         <td>${item.is_unread ? `<span class="badge unread">Unread</span>` : `<span class="badge">Seen</span>`}</td>
@@ -442,7 +451,7 @@ async function openItem(type, id) {
   els.detailBadges.innerHTML = `
     <span class="badge type-${type}">${escapeHtml(typeLabel(type))}</span>
     <span class="badge">#${currentItem.ref ?? id}</span>
-    ${currentItem.status_name ? `<span class="badge">${escapeHtml(currentItem.status_name)}</span>` : ""}
+    ${statusBadgeHtml(currentItem.status_name, currentItem.status_color)}
     ${currentItem.is_unread ? `<span class="badge unread">Unread</span>` : ""}
   `;
   els.detailTitle.textContent = currentItem.subject || `${type} #${id}`;
@@ -451,7 +460,7 @@ async function openItem(type, id) {
   els.detailSide.innerHTML = `
     <div class="row"><span>Type</span><strong>${escapeHtml(typeLabel(type))}</strong></div>
     <div class="row"><span>Ref</span><strong>#${currentItem.ref ?? id}</strong></div>
-    <div class="row"><span>Status</span><strong>${escapeHtml(currentItem.status_name || "—")}</strong></div>
+    <div class="row"><span>Status</span><strong>${statusPillHtml(currentItem.status_name, currentItem.status_color)}</strong></div>
     <div class="row"><span>Project</span><strong>${escapeHtml(currentItem.project_name || "—")}</strong></div>
     <div class="row"><span>Sprint</span><strong>${escapeHtml(currentItem.milestone_name || "—")}</strong></div>
     <div class="row"><span>Updated</span><strong>${escapeHtml(formatDate(currentItem.modified_date))}</strong></div>
@@ -475,10 +484,16 @@ async function openItem(type, id) {
       currentItem = { ...currentItem, ...detail.item };
       els.detailTitle.textContent = currentItem.subject;
       setOpenTaiga(currentItem.taiga_url || null);
+      els.detailBadges.innerHTML = `
+        <span class="badge type-${type}">${escapeHtml(typeLabel(type))}</span>
+        <span class="badge">#${currentItem.ref ?? id}</span>
+        ${statusBadgeHtml(currentItem.status_name, currentItem.status_color)}
+        ${currentItem.is_unread ? `<span class="badge unread">Unread</span>` : ""}
+      `;
       els.detailSide.innerHTML = `
         <div class="row"><span>Type</span><strong>${escapeHtml(typeLabel(type))}</strong></div>
         <div class="row"><span>Ref</span><strong>#${currentItem.ref ?? id}</strong></div>
-        <div class="row"><span>Status</span><strong>${escapeHtml(currentItem.status_name || "—")}</strong></div>
+        <div class="row"><span>Status</span><strong>${statusPillHtml(currentItem.status_name, currentItem.status_color)}</strong></div>
         <div class="row"><span>Project</span><strong>${escapeHtml(currentItem.project_name || "—")}</strong></div>
         <div class="row"><span>Sprint</span><strong>${escapeHtml(currentItem.milestone_name || "—")}</strong></div>
         <div class="row"><span>Blocked</span><strong>${currentItem.is_blocked ? "Yes" : "No"}</strong></div>
