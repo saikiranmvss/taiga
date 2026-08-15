@@ -652,8 +652,190 @@ button.status-edit:focus-visible {
 .detail-side .row:last-child { border-bottom: 0; }
 .detail-side .row span { color: var(--muted); }
 
-.comment-box { display: grid; gap: 0.65rem; margin-bottom: 1rem; }
+.comment-box { display: grid; gap: 0.65rem; margin-bottom: 1rem; margin-top: 0.85rem; }
 .subhead { margin: 0.5rem 0; font-size: 1.05rem; }
+
+.detail-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.detail-tab {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.detail-tab.active {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border-color: #b7cdc3;
+}
+.detail-tab-panel.hidden { display: none; }
+
+.comments-thread { display: grid; gap: 0.65rem; }
+.comments-list-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+.comments-empty {
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.comment-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  background: #fff;
+}
+.comment-card.is-latest {
+  background: color-mix(in srgb, var(--brand-soft) 70%, #fff);
+  border-color: #b7cdc3;
+}
+.comment-latest-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-dark);
+  margin-bottom: 0.35rem;
+}
+.comment-who {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.comment-who strong { color: #1a2a24; }
+.comment-body {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.btn-comments {
+  white-space: nowrap;
+}
+
+.comments-backdrop {
+  z-index: 80;
+}
+.comments-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.comments-sheet.is-open {
+  pointer-events: auto;
+  opacity: 1;
+}
+.comments-sheet-panel {
+  width: min(560px, 100%);
+  max-height: min(78vh, 720px);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 18px 50px rgba(28, 43, 38, 0.22);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(110%);
+  transition: transform 0.22s ease;
+  overflow: hidden;
+}
+.comments-sheet.is-open .comments-sheet-panel {
+  transform: translateY(0);
+}
+.comments-sheet .sheet-grab {
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: #c5d5ce;
+  margin: 0.55rem auto 0.15rem;
+}
+.comments-sheet .sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.9rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+.comments-sheet .sheet-close {
+  border: 0;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font: inherit;
+  cursor: pointer;
+}
+.comments-sheet-body {
+  padding: 0.75rem 0.9rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+.comments-compose {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 0.9rem 0.9rem;
+  background: #f7faf8;
+  display: grid;
+  gap: 0.45rem;
+}
+.comments-compose textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+}
+.comments-compose-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+body.comments-open { overflow: hidden; }
+
+@media (min-width: 901px) {
+  .comments-sheet {
+    align-items: center;
+    padding: 1.5rem;
+  }
+  .comments-sheet-panel {
+    border-radius: 16px;
+    max-height: min(70vh, 680px);
+  }
+  .comments-sheet .sheet-grab { display: none; }
+}
 
 .history-item {
   border: 1px solid var(--border);

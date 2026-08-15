@@ -202,6 +202,32 @@
     </section>
 
     <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+    <div class="sheet-backdrop comments-backdrop" id="comments-backdrop" hidden></div>
+
+    <div id="comments-sheet" class="comments-sheet" aria-hidden="true">
+      <div class="comments-sheet-panel">
+        <div class="sheet-grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <div>
+            <strong id="comments-sheet-title">Comments</strong>
+            <div id="comments-sheet-meta" class="muted" style="font-size:0.8rem"></div>
+          </div>
+          <button type="button" class="sheet-close" data-close-comments aria-label="Close">×</button>
+        </div>
+        <div class="comments-sheet-body">
+          <div id="comments-latest"></div>
+          <div id="comments-list" class="comments-thread"></div>
+        </div>
+        <div class="comments-compose">
+          <textarea id="comments-sheet-input" rows="2" placeholder="Write a quick comment…"></textarea>
+          <div class="comments-compose-row">
+            <span class="muted" style="font-size:0.75rem">Ctrl/⌘ + Enter to post</span>
+            <button id="comments-sheet-post" class="btn btn-primary btn-tiny" type="button">Post</button>
+          </div>
+          <div id="comments-sheet-error" class="alert hidden"></div>
+        </div>
+      </div>
+    </div>
 
     <section id="view-detail" class="panel hidden">
       <div class="detail-actions-top">
@@ -217,13 +243,23 @@
       </div>
       <div class="detail-layout">
         <div>
-          <div class="comment-box">
-            <textarea id="comment-input" rows="3" placeholder="Write a comment for your team…"></textarea>
-            <button id="comment-btn" class="btn btn-primary btn-inline" type="button">Post comment</button>
-            <div id="comment-error" class="alert hidden"></div>
+          <div class="detail-tabs" role="tablist">
+            <button type="button" class="detail-tab active" data-detail-tab="comments">Comments</button>
+            <button type="button" class="detail-tab" data-detail-tab="activity">Activity</button>
           </div>
-          <h2 class="subhead">Activity</h2>
-          <div id="history-list" class="history-list"></div>
+
+          <div id="detail-tab-comments" class="detail-tab-panel">
+            <div id="detail-comments-list" class="comments-thread"></div>
+            <div class="comment-box">
+              <textarea id="comment-input" rows="3" placeholder="Write a comment for your team…"></textarea>
+              <button id="comment-btn" class="btn btn-primary btn-inline" type="button">Post comment</button>
+              <div id="comment-error" class="alert hidden"></div>
+            </div>
+          </div>
+
+          <div id="detail-tab-activity" class="detail-tab-panel hidden">
+            <div id="history-list" class="history-list"></div>
+          </div>
         </div>
         <aside id="detail-side" class="detail-side"></aside>
       </div>

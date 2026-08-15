@@ -7,6 +7,12 @@ import {
   writeStore,
 } from "./filter-persist.js";
 import { bindStatusEditors, closeStatusMenu } from "./status-picker.js";
+import {
+  bindCommentButtons,
+  commentsButtonHtml,
+  initCommentsUi,
+  renderDetailComments,
+} from "./comments-ui.js";
 
 const FILTER_STORE_KEY = "tp_my_filters";
 const FILTER_DEFAULTS = {
@@ -54,6 +60,9 @@ const els = {
   commentInput: document.getElementById("comment-input"),
   commentError: document.getElementById("comment-error"),
   openTaigaBtn: document.getElementById("open-taiga-btn"),
+  detailCommentsList: document.getElementById("detail-comments-list"),
+  detailTabComments: document.getElementById("detail-tab-comments"),
+  detailTabActivity: document.getElementById("detail-tab-activity"),
 };
 
 function filterFieldMap() {
@@ -336,6 +345,7 @@ function renderList(items) {
         </div>
         <div class="item-actions">
           <button class="btn btn-primary btn-tiny" type="button" data-open="${item.type}:${item.id}">View</button>
+          ${commentsButtonHtml(item)}
           ${taigaLink(item)}
         </div>
       </div>`
@@ -355,9 +365,11 @@ function renderGrid(items) {
         <div class="meta">
           ${escapeHtml(item.project_name || "Project")}<br />
           ${escapeHtml(item.milestone_name || "No sprint")} · ${escapeHtml(relativeTime(item.modified_date))}
+          ${item.total_comments != null ? `<br />${item.total_comments} comment(s)` : ""}
         </div>
         <div class="card-actions">
           <button class="btn btn-primary btn-tiny" type="button" data-open="${item.type}:${item.id}">View</button>
+          ${commentsButtonHtml(item)}
           ${taigaLink(item)}
         </div>
       </article>`
@@ -380,6 +392,7 @@ function renderTable(items) {
         <td>${escapeHtml(relativeTime(item.modified_date))}</td>
         <td class="actions-cell">
           <button class="btn btn-primary btn-tiny" type="button" data-open="${item.type}:${item.id}">View</button>
+          ${commentsButtonHtml(item)}
           ${taigaLink(item)}
         </td>
       </tr>`
@@ -435,6 +448,10 @@ function renderWork(items, summary, warnings = []) {
       closeStatusMenu();
       await loadWork();
     },
+  });
+  bindCommentButtons(els.workList, {
+    openComments: (item) => commentsUi.openComments(item),
+    findItem: (type, id) => itemsCache.find((i) => i.type === type && i.id === id),
   });
   els.workList.querySelectorAll("[data-open]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -539,6 +556,26 @@ function renderDetailChrome(type, id) {
   bindDetailStatusEditors();
 }
 
+function setDetailTab(tab) {
+  const isComments = tab !== "activity";
+  document.querySelectorAll("[data-detail-tab]").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-detail-tab") === (isComments ? "comments" : "activity"));
+  });
+  els.detailTabComments?.classList.toggle("hidden", !isComments);
+  els.detailTabActivity?.classList.toggle("hidden", isComments);
+}
+
+async function loadDetailComments(type, id) {
+  if (!els.detailCommentsList) return;
+  els.detailCommentsList.innerHTML = `<div class="comments-empty">Loading comments…</div>`;
+  try {
+    const data = await api(`/api/items/${type}/${id}/comments`);
+    renderDetailComments(els.detailCommentsList, data, { relativeTime, formatDate });
+  } catch (e) {
+    els.detailCommentsList.innerHTML = `<div class="alert">${escapeHtml(e.message)}</div>`;
+  }
+}
+
 async function openItem(type, id) {
   currentItem =
     itemsCache.find((i) => i.type === type && i.id === id) || {
@@ -548,19 +585,30 @@ async function openItem(type, id) {
     };
 
   renderDetailChrome(type, id);
+  setDetailTab("comments");
   els.historyList.innerHTML = `<p class="muted">Loading activity…</p>`;
+  if (els.detailCommentsList) {
+    els.detailCommentsList.innerHTML = `<div class="comments-empty">Loading comments…</div>`;
+  }
   els.commentError.classList.add("hidden");
   show("detail");
 
   try {
-    const [detail, hist] = await Promise.all([
+    const [detail, hist, comments] = await Promise.all([
       api(`/api/items/${type}/${id}`).catch(() => null),
       api(`/api/items/${type}/${id}/history`),
+      api(`/api/items/${type}/${id}/comments`).catch(() => null),
     ]);
 
     if (detail?.item) {
       currentItem = { ...currentItem, ...detail.item };
       renderDetailChrome(type, id);
+    }
+
+    if (comments) {
+      renderDetailComments(els.detailCommentsList, comments, { relativeTime, formatDate });
+    } else {
+      await loadDetailComments(type, id);
     }
 
     renderHistory(hist.events || []);
@@ -708,6 +756,10 @@ document.querySelectorAll("#quick-chips, #quick-chips-mobile").forEach((root) =>
   });
 });
 
+document.querySelectorAll("[data-detail-tab]").forEach((btn) => {
+  btn.addEventListener("click", () => setDetailTab(btn.getAttribute("data-detail-tab")));
+});
+
 document.getElementById("comment-btn").addEventListener("click", async () => {
   if (!currentItem) return;
   els.commentError.classList.add("hidden");
@@ -723,11 +775,21 @@ document.getElementById("comment-btn").addEventListener("click", async () => {
       body: JSON.stringify({ comment }),
     });
     els.commentInput.value = "";
-    await openItem(currentItem.type, currentItem.id);
+    await loadDetailComments(currentItem.type, currentItem.id);
+    setDetailTab("comments");
   } catch (e) {
     els.commentError.textContent = e.message;
     els.commentError.classList.remove("hidden");
   }
+});
+
+const commentsUi = initCommentsUi({
+  api,
+  relativeTime,
+  formatDate,
+  onPosted: () => {
+    loadWork().catch(() => {});
+  },
 });
 
 restoreFilters();

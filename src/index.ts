@@ -662,6 +662,35 @@ app.get("/api/items/:type/:id/history", async (c) => {
   return c.json({ ok: true, events, history: history.data || [] });
 });
 
+app.get("/api/items/:type/:id/comments", async (c) => {
+  const session = await requireSession(c);
+  if (session instanceof Response) return session;
+
+  const type = c.req.param("type") as ItemType;
+  const id = Number(c.req.param("id"));
+  if (!["userstory", "task", "issue"].includes(type) || !id) {
+    return c.json({ error: "Invalid item" }, 400);
+  }
+
+  const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
+  const history = await taiga.history(session.token, type, id);
+  if (!history.ok) {
+    return c.json({ error: history.error || "Failed to load comments" }, 500);
+  }
+
+  const comments = (history.data || [])
+    .map((row) => normalizeHistoryEntry(row))
+    .filter((ev) => ev.type === "comment" && ev.body)
+    .sort((a, b) => (Date.parse(b.created_at || "") || 0) - (Date.parse(a.created_at || "") || 0));
+
+  return c.json({
+    ok: true,
+    count: comments.length,
+    latest: comments[0] || null,
+    comments,
+  });
+});
+
 app.post("/api/items/:type/:id/comment", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
