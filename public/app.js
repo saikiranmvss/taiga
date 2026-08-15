@@ -483,7 +483,7 @@ function renderHistory(events) {
             <span class="meta">${escapeHtml(relativeTime(ev.created_at))} · ${escapeHtml(formatDate(ev.created_at))}</span>
           </div>
           <div class="event-title">${escapeHtml(ev.title)}</div>
-          ${ev.body ? `<div class="body">${escapeHtml(ev.body)}</div>` : ""}
+          ${ev.body_html ? `<div class="body comment-body">${ev.body_html}</div>` : ev.body ? `<div class="body">${escapeHtml(ev.body)}</div>` : ""}
           ${changes ? `<div class="change-list">${changes}</div>` : ""}
         </article>`;
     })
