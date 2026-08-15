@@ -145,6 +145,21 @@ export class TaigaClient {
     return this.request<Record<string, unknown>>("PATCH", path, payload, token);
   }
 
+  listAttachments(token: string, type: ItemType, objectId: number) {
+    const path =
+      type === "userstory"
+        ? "/userstories/attachments"
+        : type === "task"
+          ? "/tasks/attachments"
+          : "/issues/attachments";
+    return this.request<Record<string, unknown>[]>(
+      "GET",
+      `${path}${qs({ object_id: objectId })}`,
+      null,
+      token
+    );
+  }
+
   getItem(token: string, type: ItemType, id: number) {
     const path =
       type === "userstory" ? `/userstories/${id}` : type === "task" ? `/tasks/${id}` : `/issues/${id}`;

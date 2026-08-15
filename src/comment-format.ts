@@ -234,3 +234,50 @@ export function buildCommentHtml(rawComment: string): { body: string; body_html:
     .trim();
   return { body: plain, body_html: formatCommentMarkdown(plain) };
 }
+
+/** Map attachment API rows → signed download URLs keyed by pathname / filename. */
+export function buildAttachmentUrlMap(attachments: Array<Record<string, unknown>>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const row of attachments) {
+    const signed = String(row.url || "").trim();
+    if (!signed) continue;
+    try {
+      const u = new URL(signed);
+      map.set(u.pathname, signed);
+      const file = u.pathname.split("/").filter(Boolean).pop();
+      if (file) map.set(file, signed);
+    } catch {
+      // ignore bad urls
+    }
+  }
+  return map;
+}
+
+export function resolveProtectedMediaUrl(rawUrl: string, signedMap?: Map<string, string>): string {
+  const url = String(rawUrl || "").trim();
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (signedMap?.has(u.pathname)) return signedMap.get(u.pathname)!;
+    const file = u.pathname.split("/").filter(Boolean).pop();
+    if (file && signedMap?.has(file)) return signedMap.get(file)!;
+    // Media-protected installs often need a token query to start refresh
+    if (u.pathname.includes("/media/") && !u.searchParams.has("token")) {
+      u.searchParams.set("token", "1");
+      return u.toString();
+    }
+  } catch {
+    return url;
+  }
+  return url;
+}
+
+/** Rewrite media URLs in already-built HTML to signed / tokenized URLs. */
+export function rewriteCommentMediaUrls(html: string, signedMap?: Map<string, string>): string {
+  if (!html) return html;
+  return html.replace(/https?:\/\/[^\s"'<>]+\/media\/[^\s"'<>]+/g, (match) => {
+    const cleaned = match.replace(/[),.;]+$/g, "");
+    const trailing = match.slice(cleaned.length);
+    return resolveProtectedMediaUrl(cleaned, signedMap) + trailing;
+  });
+}

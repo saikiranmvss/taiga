@@ -10,6 +10,7 @@ import {
   toSessionUser,
 } from "./session";
 import { TaigaClient, normalizeItem, type ItemType } from "./taiga";
+import { buildAttachmentUrlMap, rewriteCommentMediaUrls } from "./comment-format";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -673,14 +674,25 @@ app.get("/api/items/:type/:id/comments", async (c) => {
   }
 
   const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
-  const history = await taiga.history(session.token, type, id);
+  const [history, attachmentsRes] = await Promise.all([
+    taiga.history(session.token, type, id),
+    taiga.listAttachments(session.token, type, id),
+  ]);
   if (!history.ok) {
     return c.json({ error: history.error || "Failed to load comments" }, 500);
   }
 
+  const signedMap = buildAttachmentUrlMap(
+    attachmentsRes.ok && Array.isArray(attachmentsRes.data) ? attachmentsRes.data : []
+  );
+
   const comments = (history.data || [])
     .map((row) => normalizeHistoryEntry(row))
     .filter((ev) => ev.type === "comment" && (ev.body || ev.body_html))
+    .map((ev) => ({
+      ...ev,
+      body_html: ev.body_html ? rewriteCommentMediaUrls(ev.body_html, signedMap) : ev.body_html,
+    }))
     .sort((a, b) => (Date.parse(b.created_at || "") || 0) - (Date.parse(a.created_at || "") || 0));
 
   return c.json({
@@ -688,6 +700,13 @@ app.get("/api/items/:type/:id/comments", async (c) => {
     count: comments.length,
     latest: comments[0] || null,
     comments,
+    attachments: (attachmentsRes.data || []).map((a) => ({
+      id: Number(a.id),
+      name: String(a.name || a.attached_file || "file"),
+      url: String(a.url || ""),
+      preview_url: a.preview_url ? String(a.preview_url) : null,
+      is_image: Boolean(a.is_image ?? String(a.url || "").match(/\.(png|jpe?g|gif|webp|svg)(\?|$)/i)),
+    })),
   });
 });
 
@@ -719,39 +738,49 @@ app.get("/api/proxy-media", async (c) => {
     return c.json({ error: "Host not allowed" }, 403);
   }
 
-  const upstream = await fetch(target.toString(), {
-    headers: {
+  const candidates: string[] = [target.toString()];
+  if (!target.searchParams.has("token")) {
+    const withToken = new URL(target.toString());
+    withToken.searchParams.set("token", "1");
+    candidates.push(withToken.toString());
+    const withAuth = new URL(target.toString());
+    withAuth.searchParams.set("token", session.token);
+    candidates.push(withAuth.toString());
+  }
+
+  const headersList: HeadersInit[] = [
+    {
       Authorization: `Bearer ${session.token}`,
       Accept: "image/*,application/octet-stream,*/*",
     },
-  });
+    { Accept: "image/*,application/octet-stream,*/*" },
+  ];
 
-  if (!upstream.ok) {
-    // Some Taiga installs serve media without bearer; retry plain
-    const retry = await fetch(target.toString(), {
-      headers: { Accept: "image/*,application/octet-stream,*/*" },
-    });
-    if (!retry.ok) {
-      return c.json({ error: "Failed to fetch media" }, 502);
+  for (const candidate of candidates) {
+    for (const headers of headersList) {
+      try {
+        const upstream = await fetch(candidate, {
+          headers,
+          redirect: "follow",
+        });
+        if (!upstream.ok) continue;
+        const ctype = upstream.headers.get("content-type") || "application/octet-stream";
+        // Avoid returning HTML error pages as "images"
+        if (ctype.includes("text/html")) continue;
+        return new Response(upstream.body, {
+          status: 200,
+          headers: {
+            "Content-Type": ctype,
+            "Cache-Control": "private, max-age=300",
+          },
+        });
+      } catch {
+        // try next
+      }
     }
-    const ctype = retry.headers.get("content-type") || "application/octet-stream";
-    return new Response(retry.body, {
-      status: 200,
-      headers: {
-        "Content-Type": ctype,
-        "Cache-Control": "private, max-age=300",
-      },
-    });
   }
 
-  const ctype = upstream.headers.get("content-type") || "application/octet-stream";
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      "Content-Type": ctype,
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return c.json({ error: "Failed to fetch media" }, 502);
 });
 
 app.post("/api/items/:type/:id/comment", async (c) => {
