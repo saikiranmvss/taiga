@@ -1,0 +1,22 @@
+# Dependencies & build
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.DS_Store
+Thumbs.db
+*.log
+
+# Local test junk
+cookies.txt
+login.json
+work.json
+auth.json
+
+# Generated
+worker-configuration.generated.d.ts
+
+# Env / secrets
+.env
+.env.local
+.dev.vars.local

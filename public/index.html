@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taiga Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <strong>Taiga Portal</strong>
+          <small class="brand-sub">Developer workbench</small>
+        </div>
+      </div>
+      <div id="header-user" class="header-user hidden"></div>
+    </div>
+  </header>
+
+  <main class="site-main container">
+    <section id="view-login" class="auth-card hidden">
+      <h1>Sign in</h1>
+      <p class="lead">Find your tickets, updates, and comments in one place.</p>
+      <div id="login-error" class="alert hidden"></div>
+      <form id="login-form">
+        <label>
+          Email or username
+          <input name="username" type="text" autocomplete="username" required placeholder="you@company.com" />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+    </section>
+
+    <section id="view-work" class="hidden">
+      <div class="hero-row">
+        <div>
+          <h1>My Work</h1>
+          <p class="lead">Search and filter across every project, sprint, and ticket assigned to you.</p>
+        </div>
+        <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+      </div>
+
+      <div class="search-bar">
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search subject, #ref, project, sprint, status, tags…"
+          autocomplete="off"
+        />
+        <button id="search-btn" class="btn btn-primary btn-inline" type="button">Search</button>
+      </div>
+
+      <div class="filters" id="filters">
+        <label>
+          Type
+          <select id="filter-type">
+            <option value="all">All types</option>
+            <option value="userstory">User stories</option>
+            <option value="task">Tasks</option>
+            <option value="issue">Issues</option>
+          </select>
+        </label>
+        <label>
+          Project
+          <select id="filter-project">
+            <option value="">All projects</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select id="filter-status">
+            <option value="">All statuses</option>
+          </select>
+        </label>
+        <label>
+          Sprint
+          <select id="filter-sprint">
+            <option value="">All sprints</option>
+            <option value="__none__">No sprint</option>
+          </select>
+        </label>
+        <label>
+          Updated
+          <select id="filter-updated">
+            <option value="all" selected>Any time</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+          </select>
+        </label>
+        <label>
+          Read state
+          <select id="filter-unread">
+            <option value="all">All</option>
+            <option value="unread">Unread only</option>
+            <option value="read">Seen only</option>
+          </select>
+        </label>
+        <label>
+          Closed
+          <select id="filter-closed">
+            <option value="open" selected>Open only</option>
+            <option value="closed">Closed only</option>
+            <option value="all">Open + closed</option>
+          </select>
+        </label>
+        <label>
+          Sort
+          <select id="filter-sort">
+            <option value="updated">Recently updated</option>
+            <option value="created">Newest created</option>
+            <option value="ref">Highest ref</option>
+            <option value="subject">Subject A–Z</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="quick-chips" id="quick-chips">
+        <button type="button" class="chip" data-quick="unread">Unread</button>
+        <button type="button" class="chip" data-quick="24h">Updated 24h</button>
+        <button type="button" class="chip" data-quick="7d">Updated 7d</button>
+        <button type="button" class="chip" data-quick="issue">Issues</button>
+        <button type="button" class="chip" data-quick="task">Tasks</button>
+        <button type="button" class="chip" data-quick="story">Stories</button>
+        <button type="button" class="chip chip-clear" data-quick="clear">Clear filters</button>
+      </div>
+
+      <div id="summary-grid" class="summary-grid"></div>
+      <div id="status-grid" class="status-grid"></div>
+      <div id="work-status" class="muted work-status"></div>
+      <div id="work-list" class="work-list"></div>
+    </section>
+
+    <section id="view-detail" class="panel hidden">
+      <button id="back-btn" class="btn btn-ghost" type="button">← Back to My Work</button>
+      <div class="detail-head">
+        <div>
+          <div id="detail-badges" class="badge-row"></div>
+          <h1 id="detail-title">Ticket</h1>
+          <p id="detail-meta" class="lead"></p>
+        </div>
+      </div>
+
+      <div class="detail-layout">
+        <div>
+          <div class="comment-box">
+            <textarea id="comment-input" rows="3" placeholder="Write a comment for your team…"></textarea>
+            <button id="comment-btn" class="btn btn-primary btn-inline" type="button">Post comment</button>
+            <div id="comment-error" class="alert hidden"></div>
+          </div>
+          <h2 class="subhead">Activity</h2>
+          <div id="history-list" class="history-list"></div>
+        </div>
+        <aside id="detail-side" class="detail-side"></aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">Taiga Portal · Cloudflare Workers + D1</div>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "taiga-portal-cf",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply taiga_portal --local",
+    "db:migrate:remote": "wrangler d1 migrations apply taiga_portal --remote",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "hono": "^4.7.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "typescript": "^5.8.2",
+    "wrangler": "^4.123.0"
+  }
+}

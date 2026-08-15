@@ -1,0 +1,21 @@
+name = "taiga-portal"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "taiga_portal"
+database_id = "71128fd5-d5a6-45e7-a96c-97034981ae9c"
+migrations_dir = "migrations"
+
+[vars]
+TAIGA_API_URL = "https://taiga.cloudiumedge.com/api/v1"
+TAIGA_AUTH_TYPE = "ldap"
+APP_NAME = "Taiga Portal"
