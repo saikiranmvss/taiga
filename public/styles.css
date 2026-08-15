@@ -65,7 +65,48 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   min-height: 70px; gap: 1rem;
 }
-.brand { display: flex; align-items: center; gap: 0.75rem; }
+.brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit; }
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+.main-nav {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+.main-nav a {
+  text-decoration: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+}
+.main-nav a:hover { background: var(--brand-soft); color: var(--brand-dark); }
+.main-nav a.active {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+.teammate-bar {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) 1fr;
+  gap: 0.85rem;
+  align-items: end;
+  margin-bottom: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.teammate-meta { padding-bottom: 0.35rem; font-size: 0.9rem; }
+@media (max-width: 720px) {
+  .teammate-bar { grid-template-columns: 1fr; }
+}
+
 .brand strong { display: block; line-height: 1.1; }
 .brand-sub { color: var(--muted); font-size: 0.78rem; }
 .brand-mark {

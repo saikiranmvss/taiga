@@ -234,6 +234,48 @@ app.get("/api/projects", async (c) => {
   return c.json({ ok: true, projects });
 });
 
+app.get("/api/teammates", async (c) => {
+  const session = await requireSession(c);
+  if (session instanceof Response) return session;
+
+  const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
+  const projects = await taiga.projectsForMember(session.token, session.user.id);
+  if (!projects.ok || !Array.isArray(projects.data)) {
+    return c.json({ error: projects.error || "Failed to load projects" }, projects.status || 500);
+  }
+
+  const map = new Map<
+    number,
+    { id: number; username: string; full_name: string; full_name_display: string; color: string | null }
+  >();
+
+  await Promise.all(
+    projects.data.map(async (p) => {
+      const projectId = Number(p.id);
+      if (!projectId) return;
+      const users = await taiga.usersForProject(session.token, projectId);
+      if (!users.ok || !Array.isArray(users.data)) return;
+      for (const u of users.data) {
+        const id = Number(u.id);
+        if (!id || map.has(id)) continue;
+        map.set(id, {
+          id,
+          username: String(u.username || ""),
+          full_name: String(u.full_name || u.full_name_display || u.username || ""),
+          full_name_display: String(u.full_name_display || u.full_name || u.username || ""),
+          color: u.color ? String(u.color) : null,
+        });
+      }
+    })
+  );
+
+  const teammates = Array.from(map.values()).sort((a, b) =>
+    a.full_name_display.localeCompare(b.full_name_display)
+  );
+
+  return c.json({ ok: true, teammates, count: teammates.length });
+});
+
 app.get("/api/my-work", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
@@ -247,12 +289,17 @@ app.get("/api/my-work", async (c) => {
   const updated = c.req.query("updated") || "all"; // all | 24h | 7d | 30d
   const closed = (c.req.query("closed") || "open") as "open" | "closed" | "all";
   const sort = c.req.query("sort") || "updated"; // updated | created | ref | subject
+  const requestedUserId = c.req.query("user_id") ? Number(c.req.query("user_id")) : NaN;
+  const targetUserId =
+    Number.isFinite(requestedUserId) && requestedUserId > 0
+      ? requestedUserId
+      : session.user.id;
 
   const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
   const types = parseTypes(type);
 
   const [{ items, warnings }, reads] = await Promise.all([
-    loadAssignedWork(taiga, session.token, session.user.id, {
+    loadAssignedWork(taiga, session.token, targetUserId, {
       types,
       closed,
       project: Number.isFinite(project) ? project : undefined,
@@ -312,6 +359,7 @@ app.get("/api/my-work", async (c) => {
   return c.json({
     ok: true,
     count: withRead.length,
+    assigned_to: targetUserId,
     items: withRead,
     summary: summarize(withRead),
     facets: {

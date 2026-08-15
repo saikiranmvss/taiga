@@ -47,6 +47,24 @@ export class TaigaClient {
     );
   }
 
+  usersForProject(token: string, projectId: number) {
+    return this.request<Record<string, unknown>[]>(
+      "GET",
+      `/users${qs({ project: projectId })}`,
+      null,
+      token
+    );
+  }
+
+  membershipsForProject(token: string, projectId: number) {
+    return this.request<Record<string, unknown>[]>(
+      "GET",
+      `/memberships${qs({ project: projectId })}`,
+      null,
+      token
+    );
+  }
+
   listAssigned(
     token: string,
     kind: ItemType,

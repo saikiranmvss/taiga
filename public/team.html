@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Taiga Portal</title>
+  <title>Team Work · Taiga Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet" />
@@ -21,8 +21,8 @@
           </div>
         </a>
         <nav class="main-nav" id="main-nav">
-          <a href="/" class="active">My Work</a>
-          <a href="/team.html">Team</a>
+          <a href="/">My Work</a>
+          <a href="/team.html" class="active">Team</a>
         </nav>
       </div>
       <div id="header-user" class="header-user hidden"></div>
@@ -32,7 +32,7 @@
   <main class="site-main container">
     <section id="view-login" class="auth-card hidden">
       <h1>Sign in</h1>
-      <p class="lead">Find your tickets, updates, and comments in one place.</p>
+      <p class="lead">Sign in to browse teammate tickets.</p>
       <div id="login-error" class="alert hidden"></div>
       <form id="login-form">
         <label>
@@ -47,13 +47,23 @@
       </form>
     </section>
 
-    <section id="view-work" class="hidden">
+    <section id="view-team" class="hidden">
       <div class="hero-row">
         <div>
-          <h1>My Work</h1>
-          <p class="lead">Search and filter across every project, sprint, and ticket assigned to you.</p>
+          <h1>Team Work</h1>
+          <p class="lead">Pick a teammate to see their assigned stories, tasks, and issues — same filters as My Work.</p>
         </div>
         <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+      </div>
+
+      <div class="teammate-bar">
+        <label>
+          Teammate
+          <select id="filter-teammate">
+            <option value="">Select a teammate…</option>
+          </select>
+        </label>
+        <div id="teammate-meta" class="teammate-meta muted">Choose someone to load their board.</div>
       </div>
 
       <div class="search-bar">
@@ -150,9 +160,9 @@
           <div class="toolbar-row">
             <div id="work-status" class="muted work-status"></div>
             <div class="view-switch" role="group" aria-label="View mode">
-              <button type="button" class="view-btn active" data-view="list" title="List view">List</button>
-              <button type="button" class="view-btn" data-view="grid" title="Card grid">Grid</button>
-              <button type="button" class="view-btn" data-view="table" title="Table grid">Table</button>
+              <button type="button" class="view-btn active" data-view="list">List</button>
+              <button type="button" class="view-btn" data-view="grid">Grid</button>
+              <button type="button" class="view-btn" data-view="table">Table</button>
             </div>
           </div>
           <div id="work-list" class="work-list view-list"></div>
@@ -162,7 +172,7 @@
 
     <section id="view-detail" class="panel hidden">
       <div class="detail-actions-top">
-        <button id="back-btn" class="btn btn-ghost" type="button">← Back to My Work</button>
+        <button id="back-btn" class="btn btn-ghost" type="button">← Back to Team</button>
         <a id="open-taiga-btn" class="btn btn-primary btn-inline" href="#" target="_blank" rel="noopener noreferrer">Open in Taiga ↗</a>
       </div>
       <div class="detail-head">
@@ -172,7 +182,6 @@
           <p id="detail-meta" class="lead"></p>
         </div>
       </div>
-
       <div class="detail-layout">
         <div>
           <div class="comment-box">
@@ -189,9 +198,9 @@
   </main>
 
   <footer class="site-footer">
-    <div class="container">Taiga Portal · Cloudflare Workers + D1</div>
+    <div class="container">Taiga Portal · Team board</div>
   </footer>
 
-  <script src="/app.js" type="module"></script>
+  <script src="/team.js" type="module"></script>
 </body>
 </html>
