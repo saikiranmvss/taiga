@@ -1,4 +1,25 @@
 import { initMobileSheets } from "./mobile-ui.js";
+import {
+  applyFilters,
+  collectFilters,
+  readStore,
+  setSelectValue,
+  writeStore,
+} from "./filter-persist.js";
+
+const FILTER_STORE_KEY = "tp_my_filters";
+const FILTER_DEFAULTS = {
+  q: "",
+  type: "all",
+  project: "",
+  status: "",
+  sprint: "",
+  updated: "all",
+  unread: "all",
+  closed: "open",
+  sort: "updated",
+  view: "list",
+};
 
 const views = {
   login: document.getElementById("view-login"),
@@ -34,11 +55,45 @@ const els = {
   openTaigaBtn: document.getElementById("open-taiga-btn"),
 };
 
+function filterFieldMap() {
+  return {
+    q: els.searchInput,
+    type: els.filterType,
+    project: els.filterProject,
+    status: els.filterStatus,
+    sprint: els.filterSprint,
+    updated: els.filterUpdated,
+    unread: els.filterUnread,
+    closed: els.filterClosed,
+    sort: els.filterSort,
+  };
+}
+
+function saveFilters(extra = {}) {
+  writeStore(FILTER_STORE_KEY, {
+    ...FILTER_DEFAULTS,
+    ...collectFilters(filterFieldMap()),
+    view: viewMode,
+    ...extra,
+  });
+}
+
+function restoreFilters() {
+  const saved = applyFilters(filterFieldMap(), readStore(FILTER_STORE_KEY), FILTER_DEFAULTS);
+  return saved;
+}
+
+function resetFiltersToDefaults() {
+  applyFilters(filterFieldMap(), FILTER_DEFAULTS, FILTER_DEFAULTS);
+  saveFilters({ view: viewMode });
+}
+
 let currentUser = null;
 let currentItem = null;
 let itemsCache = [];
 let searchTimer = null;
-let viewMode = localStorage.getItem("tp_view_mode") || "list";
+let viewMode =
+  readStore(FILTER_STORE_KEY).view || localStorage.getItem("tp_view_mode") || "list";
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
@@ -127,13 +182,14 @@ function taigaLink(item) {
 }
 
 function setViewMode(mode) {
-  viewMode = mode;
-  localStorage.setItem("tp_view_mode", mode);
+  viewMode = mode || "list";
+  localStorage.setItem("tp_view_mode", viewMode);
+  saveFilters({ view: viewMode });
   document.querySelectorAll(".view-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute("data-view") === mode);
+    btn.classList.toggle("active", btn.getAttribute("data-view") === viewMode);
   });
   els.workList.classList.remove("view-list", "view-grid", "view-table");
-  els.workList.classList.add(`view-${mode}`);
+  els.workList.classList.add(`view-${viewMode}`);
   renderWork(itemsCache, lastSummary, lastWarnings);
 }
 
@@ -226,7 +282,8 @@ function renderStatusGrid(summary) {
 
   els.statusGrid.querySelectorAll(".status-card").forEach((btn) => {
     btn.addEventListener("click", () => {
-      els.filterStatus.value = btn.getAttribute("data-status") || "";
+      setSelectValue(els.filterStatus, btn.getAttribute("data-status") || "");
+      saveFilters();
       loadWork();
     });
   });
@@ -480,27 +537,31 @@ async function openItem(type, id) {
 async function loadProjects() {
   try {
     const data = await api("/api/projects");
-    const current = els.filterProject.value;
+    const saved = readStore(FILTER_STORE_KEY);
+    const current = els.filterProject.value || saved.project || "";
     fillSelect(
       els.filterProject,
       (data.projects || []).map((p) => ({ value: String(p.id), label: p.name }))
     );
-    if (current) els.filterProject.value = current;
+    setSelectValue(els.filterProject, current);
   } catch {
     // ignore
   }
 }
 
 async function loadWork() {
+  saveFilters();
   els.workStatus.textContent = "Loading…";
   try {
     const data = await api(`/api/my-work?${queryFromFilters()}`);
-    const statusVal = els.filterStatus.value;
-    const sprintVal = els.filterSprint.value;
+    const saved = readStore(FILTER_STORE_KEY);
+    const statusVal = els.filterStatus.value || saved.status || "";
+    const sprintVal = els.filterSprint.value || saved.sprint || "";
     fillSelect(els.filterStatus, data.facets?.statuses || []);
     fillSelect(els.filterSprint, data.facets?.sprints || []);
-    if (statusVal) els.filterStatus.value = statusVal;
-    if (sprintVal) els.filterSprint.value = sprintVal;
+    setSelectValue(els.filterStatus, statusVal);
+    setSelectValue(els.filterSprint, sprintVal);
+    saveFilters();
     renderWork(data.items || [], data.summary, data.warnings || []);
   } catch (e) {
     els.workStatus.textContent = e.message;
@@ -514,9 +575,8 @@ async function loadMe() {
     currentUser = data.user;
     renderHeader(currentUser);
     show("work");
-    document.querySelectorAll(".view-btn").forEach((btn) => {
-      btn.classList.toggle("active", btn.getAttribute("data-view") === viewMode);
-    });
+    restoreFilters();
+    setViewMode(viewMode);
     await loadProjects();
     await loadWork();
   } catch {
@@ -541,6 +601,8 @@ els.loginForm.addEventListener("submit", async (e) => {
     currentUser = data.user;
     renderHeader(currentUser);
     show("work");
+    restoreFilters();
+    setViewMode(viewMode);
     await loadProjects();
     await loadWork();
   } catch (err) {
@@ -559,16 +621,23 @@ document.querySelectorAll(".view-btn").forEach((btn) => {
   btn.addEventListener("click", () => setViewMode(btn.getAttribute("data-view")));
 });
 
-els.searchBtn.addEventListener("click", loadWork);
+els.searchBtn.addEventListener("click", () => {
+  saveFilters();
+  loadWork();
+});
 els.searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
+    saveFilters();
     loadWork();
   }
 });
 els.searchInput.addEventListener("input", () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(loadWork, 350);
+  searchTimer = setTimeout(() => {
+    saveFilters();
+    loadWork();
+  }, 350);
 });
 
 [
@@ -580,29 +649,27 @@ els.searchInput.addEventListener("input", () => {
   els.filterUnread,
   els.filterClosed,
   els.filterSort,
-].forEach((el) => el.addEventListener("change", loadWork));
+].forEach((el) =>
+  el.addEventListener("change", () => {
+    saveFilters();
+    loadWork();
+  })
+);
 
 document.querySelectorAll("#quick-chips, #quick-chips-mobile").forEach((root) => {
   root.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-quick]");
-  if (!btn) return;
-  const q = btn.getAttribute("data-quick");
-  if (q === "clear") {
-    els.searchInput.value = "";
-    els.filterType.value = "all";
-    els.filterProject.value = "";
-    els.filterStatus.value = "";
-    els.filterSprint.value = "";
-    els.filterUpdated.value = "all";
-    els.filterUnread.value = "all";
-    els.filterClosed.value = "open";
-    els.filterSort.value = "updated";
-  } else if (q === "unread") els.filterUnread.value = "unread";
-  else if (q === "24h" || q === "7d") els.filterUpdated.value = q;
-  else if (q === "issue") els.filterType.value = "issue";
-  else if (q === "task") els.filterType.value = "task";
-  else if (q === "story") els.filterType.value = "userstory";
-  loadWork();
+    const btn = e.target.closest("[data-quick]");
+    if (!btn) return;
+    const q = btn.getAttribute("data-quick");
+    if (q === "clear") {
+      resetFiltersToDefaults();
+    } else if (q === "unread") els.filterUnread.value = "unread";
+    else if (q === "24h" || q === "7d") els.filterUpdated.value = q;
+    else if (q === "issue") els.filterType.value = "issue";
+    else if (q === "task") els.filterType.value = "task";
+    else if (q === "story") els.filterType.value = "userstory";
+    saveFilters();
+    loadWork();
   });
 });
 
@@ -628,5 +695,6 @@ document.getElementById("comment-btn").addEventListener("click", async () => {
   }
 });
 
+restoreFilters();
 loadMe();
 initMobileSheets({ onRefresh: loadWork });
