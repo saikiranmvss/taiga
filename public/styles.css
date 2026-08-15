@@ -26,7 +26,35 @@ body {
     radial-gradient(circle at top left, rgba(47, 111, 94, 0.11), transparent 30%),
     linear-gradient(180deg, #f7faf8 0%, var(--bg) 42%, #eef4f1 100%);
 }
-.container { width: min(1120px, calc(100% - 2rem)); margin-inline: auto; }
+.container { width: min(1480px, calc(100% - 1.5rem)); margin-inline: auto; }
+
+/* Compact theme scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #7aa394 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #7aa394;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--brand);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .site-header {
   position: sticky; top: 0; z-index: 20;
   backdrop-filter: blur(12px);
@@ -174,8 +202,8 @@ input:focus, textarea:focus, select:focus {
 
 .workbench {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.1rem;
   align-items: start;
 }
 .workbench-sidebar {
@@ -186,8 +214,10 @@ input:focus, textarea:focus, select:focus {
   top: 86px;
   max-height: calc(100vh - 110px);
   overflow-y: auto;
-  padding-right: 0.15rem;
+  padding-right: 0.35rem;
+  scrollbar-gutter: stable;
 }
+
 .workbench-main {
   min-width: 0;
 }
