@@ -48,6 +48,7 @@ function matchesQuery(item: WorkItem, q: string): boolean {
     item.milestone_name,
     item.status_name,
     item.type,
+    item.assigned_name,
     ...(item.tags || []),
   ]
     .filter(Boolean)
@@ -138,6 +139,91 @@ async function loadAssignedWork(
   });
 
   return { items, warnings };
+}
+
+async function collectTeammates(taiga: TaigaClient, token: string, selfId: number) {
+  const projects = await taiga.projectsForMember(token, selfId);
+  if (!projects.ok || !Array.isArray(projects.data)) {
+    return { teammates: [] as { id: number; full_name_display: string; username: string }[], projects: [] as { id: number }[], error: projects.error };
+  }
+
+  const map = new Map<number, { id: number; full_name_display: string; username: string }>();
+  await Promise.all(
+    projects.data.map(async (p) => {
+      const projectId = Number(p.id);
+      if (!projectId) return;
+      const users = await taiga.usersForProject(token, projectId);
+      if (!users.ok || !Array.isArray(users.data)) return;
+      for (const u of users.data) {
+        const id = Number(u.id);
+        if (!id || map.has(id)) continue;
+        map.set(id, {
+          id,
+          username: String(u.username || ""),
+          full_name_display: String(u.full_name_display || u.full_name || u.username || ""),
+        });
+      }
+    })
+  );
+
+  return {
+    teammates: Array.from(map.values()),
+    projects: projects.data.map((p) => ({ id: Number(p.id) })).filter((p) => p.id),
+    error: null as string | null,
+  };
+}
+
+async function loadAllTeammatesWork(
+  taiga: TaigaClient,
+  token: string,
+  selfId: number,
+  opts: {
+    types: ItemType[];
+    closed: "open" | "closed" | "all";
+    project?: number;
+    webBase?: string;
+  }
+) {
+  const collected = await collectTeammates(taiga, token, selfId);
+  if (collected.error) {
+    return { items: [] as ReturnType<typeof normalizeItem>[], warnings: [collected.error] };
+  }
+
+  const teammateIds = new Set(collected.teammates.map((t) => t.id));
+  const projectIds = opts.project
+    ? [opts.project]
+    : collected.projects.map((p) => p.id);
+
+  const warnings: string[] = [];
+  const dedupe = new Map<string, ReturnType<typeof normalizeItem>>();
+
+  const jobs: Array<Promise<void>> = [];
+  for (const projectId of projectIds) {
+    for (const type of opts.types) {
+      jobs.push(
+        (async () => {
+          const res = await taiga.listByProject(token, type, {
+            project: projectId,
+            closed: opts.closed,
+          });
+          if (!res.ok) {
+            warnings.push(`${type}@${projectId}: ${res.error}`);
+            return;
+          }
+          if (!Array.isArray(res.data)) return;
+          for (const row of res.data) {
+            const assignedTo = row.assigned_to != null ? Number(row.assigned_to) : null;
+            if (!assignedTo || !teammateIds.has(assignedTo)) continue;
+            const item = normalizeItem(type, row, opts.webBase);
+            dedupe.set(`${item.type}:${item.id}`, item);
+          }
+        })()
+      );
+    }
+  }
+
+  await Promise.all(jobs);
+  return { items: Array.from(dedupe.values()), warnings };
 }
 
 app.get("/api/health", (c) =>
@@ -289,7 +375,9 @@ app.get("/api/my-work", async (c) => {
   const updated = c.req.query("updated") || "all"; // all | 24h | 7d | 30d
   const closed = (c.req.query("closed") || "open") as "open" | "closed" | "all";
   const sort = c.req.query("sort") || "updated"; // updated | created | ref | subject
-  const requestedUserId = c.req.query("user_id") ? Number(c.req.query("user_id")) : NaN;
+  const userIdRaw = (c.req.query("user_id") || "").trim();
+  const wantAllTeammates = userIdRaw === "all";
+  const requestedUserId = wantAllTeammates ? NaN : userIdRaw ? Number(userIdRaw) : NaN;
   const targetUserId =
     Number.isFinite(requestedUserId) && requestedUserId > 0
       ? requestedUserId
@@ -298,13 +386,22 @@ app.get("/api/my-work", async (c) => {
   const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
   const types = parseTypes(type);
 
+  const workPromise = wantAllTeammates
+    ? loadAllTeammatesWork(taiga, session.token, session.user.id, {
+        types,
+        closed,
+        project: Number.isFinite(project) ? project : undefined,
+        webBase: c.env.TAIGA_WEB_URL,
+      })
+    : loadAssignedWork(taiga, session.token, targetUserId, {
+        types,
+        closed,
+        project: Number.isFinite(project) ? project : undefined,
+        webBase: c.env.TAIGA_WEB_URL,
+      });
+
   const [{ items, warnings }, reads] = await Promise.all([
-    loadAssignedWork(taiga, session.token, targetUserId, {
-      types,
-      closed,
-      project: Number.isFinite(project) ? project : undefined,
-      webBase: c.env.TAIGA_WEB_URL,
-    }),
+    workPromise,
     listTicketReads(c.env.DB, session.user.id).catch(() => ({
       results: [] as { item_type: string; item_id: number; last_seen_at: string }[],
     })),
@@ -359,13 +456,23 @@ app.get("/api/my-work", async (c) => {
   return c.json({
     ok: true,
     count: withRead.length,
-    assigned_to: targetUserId,
+    assigned_to: wantAllTeammates ? "all" : targetUserId,
     items: withRead,
     summary: summarize(withRead),
     facets: {
       sprints,
       statuses,
       types: ["userstory", "task", "issue"],
+      assignees: Array.from(
+        new Map(
+          facetsBase
+            .filter((i) => i.assigned_to && i.assigned_name)
+            .map((i) => [
+              String(i.assigned_to),
+              { id: i.assigned_to as number, name: i.assigned_name as string },
+            ])
+        ).values()
+      ).sort((a, b) => a.name.localeCompare(b.name)),
     },
     warnings,
   });

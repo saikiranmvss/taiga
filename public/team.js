@@ -165,7 +165,9 @@ function fillSelect(select, options) {
 }
 
 function selectedTeammate() {
-  const id = Number(els.filterTeammate?.value || 0);
+  const raw = els.filterTeammate?.value || "all";
+  if (raw === "all") return { id: "all", full_name_display: "All teammates" };
+  const id = Number(raw);
   if (!id) return null;
   return teammatesCache.find((t) => t.id === id) || { id };
 }
@@ -173,7 +175,11 @@ function selectedTeammate() {
 function updateTeammateMeta() {
   const mate = selectedTeammate();
   if (!mate) {
-    els.teammateMeta.textContent = "Choose someone to load their board.";
+    els.teammateMeta.textContent = "Choose All or a teammate to load the board.";
+    return;
+  }
+  if (mate.id === "all") {
+    els.teammateMeta.textContent = `Showing tickets assigned to all teammates (${teammatesCache.length}). Use filters/search to narrow.`;
     return;
   }
   const label = mate.full_name_display || mate.username || `User #${mate.id}`;
@@ -184,7 +190,8 @@ function updateTeammateMeta() {
 function queryFromFilters() {
   const params = new URLSearchParams();
   const mate = selectedTeammate();
-  if (mate?.id) params.set("user_id", String(mate.id));
+  if (mate?.id === "all") params.set("user_id", "all");
+  else if (mate?.id) params.set("user_id", String(mate.id));
   const q = els.searchInput.value.trim();
   if (q) params.set("q", q);
   params.set("type", els.filterType.value);
@@ -253,6 +260,7 @@ function bindStopLinks(root) {
 }
 
 function renderList(items) {
+  const showAssignee = selectedTeammate()?.id === "all";
   return items
     .map(
       (item) => `
@@ -260,6 +268,7 @@ function renderList(items) {
         ${badgesHtml(item)}
         <div class="top"><div class="subject">${escapeHtml(item.subject)}</div></div>
         <div class="meta">
+          ${showAssignee ? `${escapeHtml(item.assigned_name || "Unassigned")} · ` : ""}
           ${escapeHtml(item.project_name || "Project")}
           · ${escapeHtml(item.milestone_name || "No sprint")}
           · updated ${escapeHtml(relativeTime(item.modified_date))}
@@ -275,6 +284,7 @@ function renderList(items) {
 }
 
 function renderGrid(items) {
+  const showAssignee = selectedTeammate()?.id === "all";
   return items
     .map(
       (item) => `
@@ -287,6 +297,7 @@ function renderGrid(items) {
           ${escapeHtml(item.status_name || "No status")}
         </div>
         <div class="meta">
+          ${showAssignee ? `${escapeHtml(item.assigned_name || "Unassigned")}<br />` : ""}
           ${escapeHtml(item.project_name || "Project")}<br />
           ${escapeHtml(item.milestone_name || "No sprint")} · ${escapeHtml(relativeTime(item.modified_date))}
         </div>
@@ -300,6 +311,7 @@ function renderGrid(items) {
 }
 
 function renderTable(items) {
+  const showAssignee = selectedTeammate()?.id === "all";
   const rows = items
     .map(
       (item) => `
@@ -307,6 +319,7 @@ function renderTable(items) {
         <td><strong>#${item.ref ?? item.id}</strong></td>
         <td><span class="badge type-${item.type}">${escapeHtml(typeLabel(item.type))}</span></td>
         <td class="subject-cell">${escapeHtml(item.subject)}</td>
+        ${showAssignee ? `<td>${escapeHtml(item.assigned_name || "—")}</td>` : ""}
         <td>
           <span class="status-pill">
             <i class="dot" style="background:${escapeHtml(item.status_color || "#2f6f5e")}"></i>
@@ -332,6 +345,7 @@ function renderTable(items) {
           <th>#</th>
           <th>Type</th>
           <th>Subject</th>
+          ${showAssignee ? "<th>Assignee</th>" : ""}
           <th>Status</th>
           <th>Project</th>
           <th>Sprint</th>
@@ -485,17 +499,19 @@ async function openItem(type, id) {
 async function loadTeammates() {
   const data = await api("/api/teammates");
   teammatesCache = data.teammates || [];
-  const previous = els.filterTeammate.value || localStorage.getItem("tp_selected_teammate") || "";
+  const previous = els.filterTeammate.value || localStorage.getItem("tp_selected_teammate") || "all";
   els.filterTeammate.innerHTML =
-    `<option value="">Select a teammate…</option>` +
+    `<option value="all">All teammates</option>` +
     teammatesCache
       .map((t) => {
         const label = `${t.full_name_display || t.username}${t.username ? ` (@${t.username})` : ""}`;
         return `<option value="${t.id}">${escapeHtml(label)}</option>`;
       })
       .join("");
-  if (previous && teammatesCache.some((t) => String(t.id) === String(previous))) {
+  if (previous === "all" || teammatesCache.some((t) => String(t.id) === String(previous))) {
     els.filterTeammate.value = String(previous);
+  } else {
+    els.filterTeammate.value = "all";
   }
   updateTeammateMeta();
 }
@@ -517,10 +533,10 @@ async function loadProjects() {
 async function loadWork() {
   const mate = selectedTeammate();
   if (!mate?.id) {
-    els.workStatus.textContent = "Select a teammate to load tickets.";
+    els.workStatus.textContent = "Select All or a teammate to load tickets.";
     els.summaryGrid.innerHTML = "";
     els.statusGrid.innerHTML = "";
-    els.workList.innerHTML = `<div class="panel"><p class="muted" style="margin:0">Pick a teammate above to view their assigned work.</p></div>`;
+    els.workList.innerHTML = `<div class="panel"><p class="muted" style="margin:0">Pick All teammates or one person above.</p></div>`;
     return;
   }
 

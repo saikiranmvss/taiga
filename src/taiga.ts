@@ -91,6 +91,30 @@ export class TaigaClient {
     );
   }
 
+  listByProject(
+    token: string,
+    kind: ItemType,
+    opts: { project: number; closed?: "open" | "closed" | "all"; q?: string }
+  ) {
+    const path =
+      kind === "userstory" ? "/userstories" : kind === "task" ? "/tasks" : "/issues";
+
+    const params: Record<string, string | number | boolean | undefined> = {
+      project: opts.project,
+      q: opts.q,
+    };
+
+    if (opts.closed === "open") params["status__is_closed"] = false;
+    if (opts.closed === "closed") params["status__is_closed"] = true;
+
+    return this.request<Record<string, unknown>[]>(
+      "GET",
+      `${path}${qs(params)}`,
+      null,
+      token
+    );
+  }
+
   getItem(token: string, type: ItemType, id: number) {
     const path =
       type === "userstory" ? `/userstories/${id}` : type === "task" ? `/tasks/${id}` : `/issues/${id}`;
@@ -196,6 +220,7 @@ export function normalizeItem(type: ItemType, item: Record<string, unknown>, web
     project_slug: projectSlug,
     milestone_id: milestone?.id != null ? Number(milestone.id) : item.milestone != null ? Number(item.milestone) : null,
     milestone_name: milestone?.name || null,
+    assigned_to: item.assigned_to != null ? Number(item.assigned_to) : null,
     assigned_name: assigned?.full_name_display || assigned?.username || null,
     modified_date: item.modified_date ? String(item.modified_date) : null,
     created_date: item.created_date ? String(item.created_date) : null,
