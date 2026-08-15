@@ -6,6 +6,7 @@ import {
   setSelectValue,
   writeStore,
 } from "./filter-persist.js";
+import { bindStatusEditors, closeStatusMenu } from "./status-picker.js";
 
 const FILTER_STORE_KEY = "tp_my_filters";
 const FILTER_DEFAULTS = {
@@ -164,16 +165,30 @@ function statusVars(color) {
   return `--status-color:${escapeHtml(c)}`;
 }
 
-function statusBadgeHtml(name, color) {
-  if (!name) return "";
-  return `<span class="badge status-badge" style="${statusVars(color)}">${escapeHtml(name)}</span>`;
+function statusControlHtml(item, { mode = "badge", emptyLabel = "—" } = {}) {
+  const name = item.status_name || emptyLabel;
+  if (mode === "badge" && !item.status_name) return "";
+  const cls = mode === "pill" ? "status-pill status-edit" : "badge status-badge status-edit";
+  return `<button type="button" class="${cls}" style="${statusVars(item.status_color)}"
+      data-status-edit="1"
+      data-type="${escapeHtml(item.type)}"
+      data-id="${item.id}"
+      data-project="${item.project_id || ""}"
+      data-status-id="${item.status_id || ""}"
+      data-stop="1"
+      title="Change status">
+      ${mode === "pill" ? `<i class="dot" aria-hidden="true"></i>` : ""}
+      <span class="status-edit-label">${escapeHtml(name)}</span>
+      <span class="status-caret" aria-hidden="true">▾</span>
+    </button>`;
 }
 
-function statusPillHtml(name, color) {
-  return `<span class="status-pill" style="${statusVars(color)}">
-    <i class="dot" aria-hidden="true"></i>
-    ${escapeHtml(name || "—")}
-  </span>`;
+function statusBadgeHtml(item) {
+  return statusControlHtml(item, { mode: "badge" });
+}
+
+function statusPillHtml(item, emptyLabel = "—") {
+  return statusControlHtml(item, { mode: "pill", emptyLabel });
 }
 
 function taigaLink(item) {
@@ -296,7 +311,7 @@ function badgesHtml(item) {
       <span class="badge">#${item.ref ?? item.id}</span>
       ${item.is_unread ? `<span class="badge unread">Unread</span>` : ""}
       ${item.is_blocked ? `<span class="badge blocked">Blocked</span>` : ""}
-      ${statusBadgeHtml(item.status_name, item.status_color)}
+      ${statusBadgeHtml(item)}
     </div>`;
 }
 
@@ -336,7 +351,7 @@ function renderGrid(items) {
         <div class="card-ref">${escapeHtml(typeLabel(item.type))} #${item.ref ?? item.id}</div>
         ${badgesHtml(item)}
         <div class="subject">${escapeHtml(item.subject)}</div>
-        ${statusPillHtml(item.status_name || "No status", item.status_color)}
+        ${statusPillHtml(item, "No status")}
         <div class="meta">
           ${escapeHtml(item.project_name || "Project")}<br />
           ${escapeHtml(item.milestone_name || "No sprint")} · ${escapeHtml(relativeTime(item.modified_date))}
@@ -358,7 +373,7 @@ function renderTable(items) {
         <td><strong>#${item.ref ?? item.id}</strong></td>
         <td><span class="badge type-${item.type}">${escapeHtml(typeLabel(item.type))}</span></td>
         <td class="subject-cell">${escapeHtml(item.subject)}</td>
-        <td>${statusPillHtml(item.status_name, item.status_color)}</td>
+        <td>${statusPillHtml(item)}</td>
         <td>${escapeHtml(item.project_name || "—")}</td>
         <td>${escapeHtml(item.milestone_name || "—")}</td>
         <td>${item.is_unread ? `<span class="badge unread">Unread</span>` : `<span class="badge">Seen</span>`}</td>
@@ -413,6 +428,14 @@ function renderWork(items, summary, warnings = []) {
   else els.workList.innerHTML = renderList(items);
 
   bindStopLinks(els.workList);
+  bindStatusEditors(els.workList, {
+    api,
+    findItem: (type, id) => itemsCache.find((i) => i.type === type && i.id === id),
+    onChanged: async () => {
+      closeStatusMenu();
+      await loadWork();
+    },
+  });
   els.workList.querySelectorAll("[data-open]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -461,18 +484,30 @@ function setOpenTaiga(url) {
   }
 }
 
-async function openItem(type, id) {
-  currentItem =
-    itemsCache.find((i) => i.type === type && i.id === id) || {
-      type,
-      id,
-      subject: "Ticket",
-    };
+function bindDetailStatusEditors() {
+  bindStatusEditors(els.detailBadges, {
+    api,
+    findItem: () => currentItem,
+    onChanged: async (item) => {
+      if (item) currentItem = { ...currentItem, ...item };
+      await openItem(currentItem.type, currentItem.id);
+    },
+  });
+  bindStatusEditors(els.detailSide, {
+    api,
+    findItem: () => currentItem,
+    onChanged: async (item) => {
+      if (item) currentItem = { ...currentItem, ...item };
+      await openItem(currentItem.type, currentItem.id);
+    },
+  });
+}
 
+function renderDetailChrome(type, id) {
   els.detailBadges.innerHTML = `
     <span class="badge type-${type}">${escapeHtml(typeLabel(type))}</span>
     <span class="badge">#${currentItem.ref ?? id}</span>
-    ${statusBadgeHtml(currentItem.status_name, currentItem.status_color)}
+    ${statusBadgeHtml(currentItem)}
     ${currentItem.is_unread ? `<span class="badge unread">Unread</span>` : ""}
   `;
   els.detailTitle.textContent = currentItem.subject || `${type} #${id}`;
@@ -481,16 +516,38 @@ async function openItem(type, id) {
   els.detailSide.innerHTML = `
     <div class="row"><span>Type</span><strong>${escapeHtml(typeLabel(type))}</strong></div>
     <div class="row"><span>Ref</span><strong>#${currentItem.ref ?? id}</strong></div>
-    <div class="row"><span>Status</span><strong>${statusPillHtml(currentItem.status_name, currentItem.status_color)}</strong></div>
+    <div class="row"><span>Status</span><strong>${statusPillHtml(currentItem)}</strong></div>
     <div class="row"><span>Project</span><strong>${escapeHtml(currentItem.project_name || "—")}</strong></div>
     <div class="row"><span>Sprint</span><strong>${escapeHtml(currentItem.milestone_name || "—")}</strong></div>
+    ${
+      currentItem.is_blocked != null
+        ? `<div class="row"><span>Blocked</span><strong>${currentItem.is_blocked ? "Yes" : "No"}</strong></div>`
+        : ""
+    }
     <div class="row"><span>Updated</span><strong>${escapeHtml(formatDate(currentItem.modified_date))}</strong></div>
+    ${
+      currentItem.created_date
+        ? `<div class="row"><span>Created</span><strong>${escapeHtml(formatDate(currentItem.created_date))}</strong></div>`
+        : ""
+    }
     ${
       currentItem.taiga_url
         ? `<div class="row"><span>Taiga</span><strong><a href="${escapeHtml(currentItem.taiga_url)}" target="_blank" rel="noopener noreferrer">Open ticket ↗</a></strong></div>`
         : ""
     }
   `;
+  bindDetailStatusEditors();
+}
+
+async function openItem(type, id) {
+  currentItem =
+    itemsCache.find((i) => i.type === type && i.id === id) || {
+      type,
+      id,
+      subject: "Ticket",
+    };
+
+  renderDetailChrome(type, id);
   els.historyList.innerHTML = `<p class="muted">Loading activity…</p>`;
   els.commentError.classList.add("hidden");
   show("detail");
@@ -503,29 +560,7 @@ async function openItem(type, id) {
 
     if (detail?.item) {
       currentItem = { ...currentItem, ...detail.item };
-      els.detailTitle.textContent = currentItem.subject;
-      setOpenTaiga(currentItem.taiga_url || null);
-      els.detailBadges.innerHTML = `
-        <span class="badge type-${type}">${escapeHtml(typeLabel(type))}</span>
-        <span class="badge">#${currentItem.ref ?? id}</span>
-        ${statusBadgeHtml(currentItem.status_name, currentItem.status_color)}
-        ${currentItem.is_unread ? `<span class="badge unread">Unread</span>` : ""}
-      `;
-      els.detailSide.innerHTML = `
-        <div class="row"><span>Type</span><strong>${escapeHtml(typeLabel(type))}</strong></div>
-        <div class="row"><span>Ref</span><strong>#${currentItem.ref ?? id}</strong></div>
-        <div class="row"><span>Status</span><strong>${statusPillHtml(currentItem.status_name, currentItem.status_color)}</strong></div>
-        <div class="row"><span>Project</span><strong>${escapeHtml(currentItem.project_name || "—")}</strong></div>
-        <div class="row"><span>Sprint</span><strong>${escapeHtml(currentItem.milestone_name || "—")}</strong></div>
-        <div class="row"><span>Blocked</span><strong>${currentItem.is_blocked ? "Yes" : "No"}</strong></div>
-        <div class="row"><span>Updated</span><strong>${escapeHtml(formatDate(currentItem.modified_date))}</strong></div>
-        <div class="row"><span>Created</span><strong>${escapeHtml(formatDate(currentItem.created_date))}</strong></div>
-        ${
-          currentItem.taiga_url
-            ? `<div class="row"><span>Taiga</span><strong><a href="${escapeHtml(currentItem.taiga_url)}" target="_blank" rel="noopener noreferrer">Open ticket ↗</a></strong></div>`
-            : ""
-        }
-      `;
+      renderDetailChrome(type, id);
     }
 
     renderHistory(hist.events || []);

@@ -124,6 +124,27 @@ export class TaigaClient {
     );
   }
 
+  statusesForProject(token: string, kind: ItemType, projectId: number) {
+    const path =
+      kind === "userstory"
+        ? "/userstory-statuses"
+        : kind === "task"
+          ? "/task-statuses"
+          : "/issue-statuses";
+    return this.request<Record<string, unknown>[]>(
+      "GET",
+      `${path}${qs({ project: projectId })}`,
+      null,
+      token
+    );
+  }
+
+  patchItem(token: string, type: ItemType, id: number, payload: Record<string, unknown>) {
+    const path =
+      type === "userstory" ? `/userstories/${id}` : type === "task" ? `/tasks/${id}` : `/issues/${id}`;
+    return this.request<Record<string, unknown>>("PATCH", path, payload, token);
+  }
+
   getItem(token: string, type: ItemType, id: number) {
     const path =
       type === "userstory" ? `/userstories/${id}` : type === "task" ? `/tasks/${id}` : `/issues/${id}`;

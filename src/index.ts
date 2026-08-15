@@ -564,6 +564,77 @@ app.get("/api/items/:type/:id", async (c) => {
   return c.json({ ok: true, item: normalizeItem(type, result.data, c.env.TAIGA_WEB_URL), raw: result.data });
 });
 
+app.get("/api/statuses", async (c) => {
+  const session = await requireSession(c);
+  if (session instanceof Response) return session;
+
+  const type = (c.req.query("type") || "") as ItemType;
+  const projectId = Number(c.req.query("project"));
+  if (!["userstory", "task", "issue"].includes(type) || !projectId) {
+    return c.json({ error: "type and project are required" }, 400);
+  }
+
+  const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
+  const result = await taiga.statusesForProject(session.token, type, projectId);
+  if (!result.ok || !Array.isArray(result.data)) {
+    return c.json({ error: result.error || "Failed to load statuses" }, 500);
+  }
+
+  const statuses = result.data
+    .map((row) => ({
+      id: Number(row.id),
+      name: String(row.name || ""),
+      color: row.color ? String(row.color) : null,
+      order: row.order != null ? Number(row.order) : 0,
+      is_closed: Boolean(row.is_closed),
+    }))
+    .filter((s) => s.id && s.name)
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+
+  return c.json({ ok: true, statuses });
+});
+
+app.patch("/api/items/:type/:id/status", async (c) => {
+  const session = await requireSession(c);
+  if (session instanceof Response) return session;
+
+  const type = c.req.param("type") as ItemType;
+  const id = Number(c.req.param("id"));
+  if (!["userstory", "task", "issue"].includes(type) || !id) {
+    return c.json({ error: "Invalid item" }, 400);
+  }
+
+  let body: { status_id?: number };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const statusId = Number(body.status_id);
+  if (!statusId) return c.json({ error: "status_id is required" }, 400);
+
+  const taiga = new TaigaClient(c.env.TAIGA_API_URL, c.env.TAIGA_AUTH_TYPE);
+  const current = await taiga.getItem(session.token, type, id);
+  if (!current.ok || !current.data) {
+    return c.json({ error: current.error || "Not found" }, 404);
+  }
+
+  const version = current.data.version != null ? Number(current.data.version) : undefined;
+  const result = await taiga.patchItem(session.token, type, id, {
+    status: statusId,
+    ...(Number.isFinite(version) ? { version } : {}),
+  });
+  if (!result.ok || !result.data) {
+    return c.json({ error: result.error || "Failed to update status" }, 500);
+  }
+
+  return c.json({
+    ok: true,
+    item: normalizeItem(type, result.data, c.env.TAIGA_WEB_URL),
+  });
+});
+
 app.get("/api/items/:type/:id/history", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
