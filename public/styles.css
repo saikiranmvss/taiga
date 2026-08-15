@@ -172,34 +172,55 @@ input:focus, textarea:focus, select:focus {
 }
 .chip-clear { color: var(--danger); }
 
-.summary-grid, .status-grid {
+.workbench {
   display: grid;
-  gap: 0.65rem;
-  margin-bottom: 0.85rem;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
 }
-.summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.workbench-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  position: sticky;
+  top: 86px;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  padding-right: 0.15rem;
 }
+.workbench-main {
+  min-width: 0;
+}
+
+.summary-grid,
 .status-grid {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0;
 }
-.stat-card, .status-card {
+
+.stat-card,
+.status-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 0.9rem 1rem;
+  padding: 0.8rem 0.9rem;
   box-shadow: var(--shadow);
+  width: 100%;
 }
-.stat-card span, .status-card span {
+.stat-card span,
+.status-card span {
   display: block;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 0.25rem;
 }
-.stat-card strong, .status-card strong {
-  font-size: 1.35rem;
+.stat-card strong,
+.status-card strong {
+  font-size: 1.2rem;
 }
 .status-card {
   cursor: pointer;
@@ -212,6 +233,23 @@ input:focus, textarea:focus, select:focus {
   width: 8px; height: 8px; border-radius: 50%;
   display: inline-block; margin-right: 0.35rem;
   vertical-align: middle;
+}
+
+@media (max-width: 900px) {
+  .workbench {
+    grid-template-columns: 1fr;
+  }
+  .workbench-sidebar {
+    position: static;
+    max-height: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  .summary-grid,
+  .status-grid {
+    display: contents;
+  }
 }
 
 .toolbar-row {
@@ -386,10 +424,6 @@ input:focus, textarea:focus, select:focus {
 }
 .work-item .item-actions .btn { width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem; }
 
-@media (max-width: 900px) {
-  .tickets-table .subject-cell { max-width: 200px; }
-}
-
 .badge-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; }
 .badge {
   font-size: 0.72rem;
@@ -470,11 +504,12 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 900px) {
   .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .detail-layout { grid-template-columns: 1fr; }
+  .tickets-table .subject-cell { max-width: 200px; }
 }
 @media (max-width: 640px) {
   .user-meta { display: none; }
-  .filters, .summary-grid { grid-template-columns: 1fr; }
+  .filters { grid-template-columns: 1fr; }
   .search-bar { grid-template-columns: 1fr; }
+  .workbench-sidebar { grid-template-columns: 1fr; }
 }

@@ -135,17 +135,23 @@
         <button type="button" class="chip chip-clear" data-quick="clear">Clear filters</button>
       </div>
 
-      <div class="toolbar-row">
-        <div id="work-status" class="muted work-status"></div>
-        <div class="view-switch" role="group" aria-label="View mode">
-          <button type="button" class="view-btn active" data-view="list" title="List view">List</button>
-          <button type="button" class="view-btn" data-view="grid" title="Card grid">Grid</button>
-          <button type="button" class="view-btn" data-view="table" title="Table grid">Table</button>
+      <div class="workbench">
+        <aside class="workbench-sidebar">
+          <div id="summary-grid" class="summary-grid"></div>
+          <div id="status-grid" class="status-grid"></div>
+        </aside>
+        <div class="workbench-main">
+          <div class="toolbar-row">
+            <div id="work-status" class="muted work-status"></div>
+            <div class="view-switch" role="group" aria-label="View mode">
+              <button type="button" class="view-btn active" data-view="list" title="List view">List</button>
+              <button type="button" class="view-btn" data-view="grid" title="Card grid">Grid</button>
+              <button type="button" class="view-btn" data-view="table" title="Table grid">Table</button>
+            </div>
+          </div>
+          <div id="work-list" class="work-list view-list"></div>
         </div>
       </div>
-      <div id="summary-grid" class="summary-grid"></div>
-      <div id="status-grid" class="status-grid"></div>
-      <div id="work-list" class="work-list view-list"></div>
     </section>
 
     <section id="view-detail" class="panel hidden">
