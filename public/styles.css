@@ -573,14 +573,222 @@ input:focus, textarea:focus, select:focus {
 }
 .change-list em { color: var(--muted); font-style: normal; }
 
+.mobile-tools { display: none; }
+.mobile-chips { display: none; }
+.mobile-only { display: none; }
+
 @media (max-width: 900px) {
   .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .detail-layout { grid-template-columns: 1fr; }
   .tickets-table .subject-cell { max-width: 200px; }
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+
+  .site-main { padding: 0.85rem 0 5.5rem; }
+  .hero-row { margin-bottom: 0.55rem; }
+  .hero-row .lead { display: none; }
+  h1 { font-size: 1.35rem; }
+
+  .header-inner { min-height: 58px; }
+  .brand-sub { display: none; }
+  .main-nav a { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
+  .avatar { width: 34px; height: 34px; font-size: 0.75rem; }
+  .btn-ghost { padding: 0.45rem 0.65rem; font-size: 0.8rem; }
+
+  .mobile-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
+  }
+  .btn-tool {
+    width: 100%;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--brand-dark);
+    font-size: 0.82rem;
+    padding: 0.55rem 0.4rem;
+  }
+
+  .mobile-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.4rem;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.15rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-chips .chip {
+    flex: 0 0 auto;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.75rem;
+  }
+
+  .workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet-filters {
+    position: fixed;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    z-index: 60;
+    max-height: 58vh;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(28, 43, 38, 0.22);
+    transform: translateY(120%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.22s ease, opacity 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-filters.is-open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .workbench-sidebar.sheet-stats {
+    position: fixed;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    z-index: 60;
+    top: auto;
+    max-height: 58vh;
+    width: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(28, 43, 38, 0.22);
+    transform: translateY(120%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.22s ease, opacity 0.22s ease;
+    overflow: hidden;
+    padding: 0;
+  }
+  .workbench-sidebar.sheet-stats.is-open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sheet-grab {
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: #c5d5ce;
+    margin: 0.55rem auto 0.15rem;
+  }
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0.9rem 0.55rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet-close {
+    border: 0;
+    background: var(--brand-soft);
+    color: var(--brand-dark);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font: inherit;
+    cursor: pointer;
+  }
+  .sheet-body {
+    padding: 0.75rem 0.9rem 0.9rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sheet-apply { margin-top: 0.65rem; }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(28, 43, 38, 0.28);
+    backdrop-filter: blur(2px);
+  }
+  .sheet-backdrop.is-open { display: block; }
+  body.sheet-open { overflow: hidden; }
+
+  .stat-card, .status-card {
+    padding: 0.65rem 0.75rem;
+  }
+  .stat-card strong, .status-card strong { font-size: 1.05rem; }
+
+  .work-item, .ticket-card {
+    padding: 0.8rem 0.85rem;
+    border-radius: 12px;
+  }
+  .ticket-card { min-height: 0; }
+  .work-list.view-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teammate-bar {
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.55rem;
+  }
+  .teammate-meta { font-size: 0.8rem; }
+
+  .detail-actions-top {
+    position: sticky;
+    top: 58px;
+    z-index: 15;
+    background: rgba(247, 250, 248, 0.94);
+    padding: 0.35rem 0;
+    backdrop-filter: blur(8px);
+  }
 }
+
+@media (min-width: 901px) {
+  .mobile-tools,
+  .mobile-chips,
+  .mobile-only { display: none !important; }
+
+  .sheet-filters.desktop-filters {
+    position: static;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+    max-height: none;
+    box-shadow: none;
+    border: 0;
+    background: transparent;
+    margin-bottom: 0.75rem;
+  }
+  .sheet-filters .sheet-body { padding: 0; overflow: visible; }
+  .sheet-filters .sheet-apply { display: none; }
+
+  .workbench-sidebar.sheet-stats {
+    position: sticky;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+    max-height: calc(100vh - 110px);
+    box-shadow: none;
+    border: 0;
+    background: transparent;
+  }
+  .workbench-sidebar .sheet-body { padding: 0; overflow: visible; }
+  .sheet-backdrop { display: none !important; }
+}
+
 @media (max-width: 640px) {
   .user-meta { display: none; }
-  .filters { grid-template-columns: 1fr; }
-  .search-bar { grid-template-columns: 1fr; }
-  .workbench-sidebar { grid-template-columns: 1fr; }
+  .filters { grid-template-columns: 1fr 1fr; }
+  .search-bar { grid-template-columns: 1fr auto; }
+  .btn-inline { padding: 0.7rem 0.85rem; }
 }

@@ -1,3 +1,5 @@
+import { initMobileSheets } from "./mobile-ui.js";
+
 const views = {
   login: document.getElementById("view-login"),
   work: document.getElementById("view-team"),
@@ -637,7 +639,8 @@ els.searchInput.addEventListener("input", () => {
   els.filterSort,
 ].forEach((el) => el.addEventListener("change", loadWork));
 
-document.getElementById("quick-chips").addEventListener("click", (e) => {
+document.querySelectorAll("#quick-chips, #quick-chips-mobile").forEach((root) => {
+  root.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-quick]");
   if (!btn) return;
   const q = btn.getAttribute("data-quick");
@@ -657,6 +660,7 @@ document.getElementById("quick-chips").addEventListener("click", (e) => {
   else if (q === "task") els.filterType.value = "task";
   else if (q === "story") els.filterType.value = "userstory";
   loadWork();
+  });
 });
 
 document.getElementById("comment-btn").addEventListener("click", async () => {
@@ -682,3 +686,4 @@ document.getElementById("comment-btn").addEventListener("click", async () => {
 });
 
 loadMe();
+initMobileSheets({ onRefresh: loadWork });
