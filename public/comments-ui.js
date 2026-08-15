@@ -8,10 +8,121 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;");
 }
 
+function escapeAttr(str) {
+  return escapeHtml(str).replaceAll("'", "&#39;");
+}
+
+function isSafeHttpUrl(url) {
+  try {
+    const u = new URL(String(url));
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeImageUrl(url) {
+  try {
+    const path = new URL(String(url)).pathname.toLowerCase();
+    return /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(path) || path.includes("/media/attachments/");
+  } catch {
+    return false;
+  }
+}
+
+function trimUrlMatch(url) {
+  return String(url).replace(/[),.;!?]+$/g, "");
+}
+
+/** Turn markdown/plain comment text into safe HTML with images + links. */
+export function formatCommentHtml(raw) {
+  const text = String(raw || "").replace(/\r\n/g, "\n").trim();
+  if (!text) return "";
+
+  const tokens = [];
+  const token = (html) => {
+    const key = `@@CMT${tokens.length}@@`;
+    tokens.push(html);
+    return key;
+  };
+
+  let s = text;
+
+  // Markdown images: ![alt](url)
+  s = s.replace(/!\[([^\]]*)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, (full, alt, url) => {
+    if (!isSafeHttpUrl(url)) return full;
+    const safe = escapeAttr(url);
+    const label = escapeHtml(alt || "Attachment");
+    return token(
+      `<figure class="comment-attach"><a href="${safe}" target="_blank" rel="noopener noreferrer"><img src="${safe}" alt="${label}" loading="lazy" /></a></figure>`
+    );
+  });
+
+  // Markdown links: [label](url)
+  s = s.replace(/\[([^\]]+)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, (full, label, url) => {
+    if (!isSafeHttpUrl(url)) return full;
+    return token(
+      `<a class="comment-link" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+    );
+  });
+
+  // Bare URLs
+  s = s.replace(/(https?:\/\/[^\s<]+)/g, (full) => {
+    const url = trimUrlMatch(full);
+    const trailing = full.slice(url.length);
+    if (!isSafeHttpUrl(url)) return full;
+    if (looksLikeImageUrl(url)) {
+      const safe = escapeAttr(url);
+      return (
+        token(
+          `<figure class="comment-attach"><a href="${safe}" target="_blank" rel="noopener noreferrer"><img src="${safe}" alt="Attachment" loading="lazy" /></a></figure>`
+        ) + trailing
+      );
+    }
+    return (
+      token(
+        `<a class="comment-link" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`
+      ) + trailing
+    );
+  });
+
+  // Escape remaining text, keep newlines
+  s = escapeHtml(s).replace(/\n/g, "<br>");
+
+  tokens.forEach((html, i) => {
+    s = s.replaceAll(`@@CMT${i}@@`, html);
+  });
+
+  // Clean up excess breaks around figures
+  s = s
+    .replace(/(?:<br>\s*){0,2}(<figure class="comment-attach">)/g, "$1")
+    .replace(/(<\/figure>)(?:\s*<br>){0,2}/g, "$1");
+
+  return s;
+}
+
 function formatSnippet(text, max = 160) {
-  const t = String(text || "").replace(/\s+/g, " ").trim();
+  const t = String(text || "")
+    .replace(/!\[[^\]]*\]\(\s*https?:\/\/[^)\s]+\s*\)/g, "[image]")
+    .replace(/https?:\/\/\S+/g, "[link]")
+    .replace(/\s+/g, " ")
+    .trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max)}…`;
+}
+
+function renderCommentCard(c, { latest = false, relativeTime, formatDate } = {}) {
+  return `
+    <article class="comment-card${latest ? " is-latest" : ""}">
+      ${latest ? `<div class="comment-latest-label">Latest comment</div>` : ""}
+      <div class="comment-who">
+        <strong>${escapeHtml(c.user_name || "Someone")}</strong>
+        <span>${escapeHtml(relativeTime?.(c.created_at) || "")}${
+          formatDate ? ` · ${escapeHtml(formatDate(c.created_at))}` : ""
+        }</span>
+      </div>
+      <div class="comment-body">${formatCommentHtml(c.body || "")}</div>
+    </article>`;
 }
 
 export function initCommentsUi({
@@ -30,7 +141,7 @@ export function initCommentsUi({
   const postBtn = document.getElementById("comments-sheet-post");
   const errorEl = document.getElementById("comments-sheet-error");
 
-  let current = null; // { type, id, subject, ref }
+  let current = null;
   let busy = false;
 
   function closeComments() {
@@ -42,20 +153,6 @@ export function initCommentsUi({
     }
     document.body.classList.remove("comments-open");
     current = null;
-  }
-
-  function renderCommentCard(c, { latest = false } = {}) {
-    return `
-      <article class="comment-card${latest ? " is-latest" : ""}">
-        ${latest ? `<div class="comment-latest-label">Latest comment</div>` : ""}
-        <div class="comment-who">
-          <strong>${escapeHtml(c.user_name || "Someone")}</strong>
-          <span>${escapeHtml(relativeTime?.(c.created_at) || "")}${
-            formatDate ? ` · ${escapeHtml(formatDate(c.created_at))}` : ""
-          }</span>
-        </div>
-        <div class="comment-body">${escapeHtml(c.body || "")}</div>
-      </article>`;
   }
 
   function renderComments(data) {
@@ -70,25 +167,23 @@ export function initCommentsUi({
 
     if (latestEl) {
       latestEl.innerHTML = latest
-        ? renderCommentCard(latest, { latest: true })
+        ? renderCommentCard(latest, { latest: true, relativeTime, formatDate })
         : `<div class="comments-empty">No comments yet — be the first.</div>`;
     }
 
     if (listEl) {
-      const rest = latest ? comments.filter((c) => c !== latest && c.id !== latest.id) : comments;
-      // Prefer filter by id; if ids missing, skip first when latest shown
       const others =
         latest && comments[0] === latest
           ? comments.slice(1)
-          : rest.length
-            ? rest
-            : comments.slice(latest ? 1 : 0);
+          : latest
+            ? comments.filter((c) => c.id !== latest.id)
+            : comments;
 
       listEl.innerHTML = others.length
-        ? `<div class="comments-list-label">Earlier</div>${others.map((c) => renderCommentCard(c)).join("")}`
-        : latest
-          ? ""
-          : "";
+        ? `<div class="comments-list-label">Earlier</div>${others
+            .map((c) => renderCommentCard(c, { relativeTime, formatDate }))
+            .join("")}`
+        : "";
     }
   }
 
@@ -212,31 +307,12 @@ export function renderDetailComments(target, data, { relativeTime, formatDate })
   const others = latest ? comments.slice(1) : comments;
 
   const latestHtml = latest
-    ? `
-      <article class="comment-card is-latest">
-        <div class="comment-latest-label">Latest comment</div>
-        <div class="comment-who">
-          <strong>${escapeHtml(latest.user_name || "Someone")}</strong>
-          <span>${escapeHtml(relativeTime?.(latest.created_at) || "")}${
-            formatDate ? ` · ${escapeHtml(formatDate(latest.created_at))}` : ""
-          }</span>
-        </div>
-        <div class="comment-body">${escapeHtml(latest.body || "")}</div>
-      </article>`
+    ? renderCommentCard(latest, { latest: true, relativeTime, formatDate })
     : `<div class="comments-empty">No comments yet.</div>`;
 
   const listHtml = others.length
     ? `<div class="comments-list-label">Earlier (${others.length})</div>${others
-        .map(
-          (c) => `
-        <article class="comment-card">
-          <div class="comment-who">
-            <strong>${escapeHtml(c.user_name || "Someone")}</strong>
-            <span>${escapeHtml(relativeTime?.(c.created_at) || "")}</span>
-          </div>
-          <div class="comment-body">${escapeHtml(c.body || "")}</div>
-        </article>`
-        )
+        .map((c) => renderCommentCard(c, { relativeTime, formatDate }))
         .join("")}`
     : "";
 
